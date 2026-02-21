@@ -68,8 +68,8 @@ export class CharacterManager {
   private uSpeed = uniform(0.015);
   private uSeparationRadius = uniform(0.6);
   private uSeparationStrength = uniform(0.030);
-  private uWorldSize = uniform(20.0);
-  private worldSize = 20.0;
+  private uWorldSize = uniform(25.0);  // matches store default
+  private worldSize = 25.0;            // matches store default
 
   public isLoaded = false;
 
@@ -78,8 +78,10 @@ export class CharacterManager {
   public async load() {
     const loader = new GLTFLoader();
     try {
+      console.log('[CharacterManager] Loading character model…');
       const gltf = await loader.loadAsync('/models/character.glb');
       const model = gltf.scene;
+      console.log('[CharacterManager] Model loaded — animations:', gltf.animations.length);
 
       let skinnedMesh: THREE.SkinnedMesh | null = null;
       model.traverse((child) => {
@@ -88,38 +90,69 @@ export class CharacterManager {
         }
       });
 
-      if (!skinnedMesh) return;
+      if (skinnedMesh) {
+        console.log('[CharacterManager] SkinnedMesh found');
+        this.baseGeometry = skinnedMesh.geometry;
+        this.baseMaterial = skinnedMesh.material as THREE.MeshStandardMaterial;
 
-      // Map animations by name if possible, or by index as fallback
-      const clips = gltf.animations;
-      const idleClip = clips.find(c => c.name.toLowerCase().includes('idle')) || clips[0];
-      const walkClip = clips.find(c => c.name.toLowerCase().includes('walk')) || clips[1];
-      const waveClip = clips.find(c => c.name.toLowerCase().includes('wave')) || clips[2] || clips[0];
+        const clips = gltf.animations;
+        if (clips.length > 0) {
+          try {
+            // Map animations by name if possible, or by index as safe fallback
+            const idleClip = clips.find(c => c.name.toLowerCase().includes('idle')) || clips[0];
+            const walkClip = clips.find(c => c.name.toLowerCase().includes('walk')) || clips[Math.min(1, clips.length - 1)];
+            const waveClip = clips.find(c => c.name.toLowerCase().includes('wave')) || clips[Math.min(2, clips.length - 1)] || clips[0];
 
-      this.baseGeometry = skinnedMesh.geometry;
-      this.baseMaterial = skinnedMesh.material as THREE.MeshStandardMaterial;
+            const walkData = this.bakeAnimation(skinnedMesh, walkClip, model);
+            this.bakedWalkBuffer = walkData.buffer;
+            this.numWalkFrames = walkData.numFrames;
+            this.walkDuration = walkData.duration;
+            this.numBones = walkData.numBones;
 
-      const walkData = this.bakeAnimation(skinnedMesh, walkClip, model);
-      this.bakedWalkBuffer = walkData.buffer;
-      this.numWalkFrames = walkData.numFrames;
-      this.walkDuration = walkData.duration;
-      this.numBones = walkData.numBones;
+            const idleData = this.bakeAnimation(skinnedMesh, idleClip, model);
+            this.bakedIdleBuffer = idleData.buffer;
+            this.numIdleFrames = idleData.numFrames;
+            this.idleDuration = idleData.duration;
 
-      const idleData = this.bakeAnimation(skinnedMesh, idleClip, model);
-      this.bakedIdleBuffer = idleData.buffer;
-      this.numIdleFrames = idleData.numFrames;
-      this.idleDuration = idleData.duration;
+            const waveData = this.bakeAnimation(skinnedMesh, waveClip, model);
+            this.bakedWaveBuffer = waveData.buffer;
+            this.numWaveFrames = waveData.numFrames;
+            this.waveDuration = waveData.duration;
 
-      const waveData = this.bakeAnimation(skinnedMesh, waveClip, model);
-      this.bakedWaveBuffer = waveData.buffer;
-      this.numWaveFrames = waveData.numFrames;
-      this.waveDuration = waveData.duration;
-
-      this.initInstances();
-      this.isLoaded = true;
+            console.log('[CharacterManager] Animations baked — walk:', this.numWalkFrames, 'idle:', this.numIdleFrames, 'wave:', this.numWaveFrames, 'bones:', this.numBones);
+          } catch (animErr) {
+            console.warn('[CharacterManager] Animation baking failed, using static mesh:', animErr);
+          }
+        } else {
+          console.warn('[CharacterManager] No animation clips in model');
+        }
+      } else {
+        console.warn('[CharacterManager] No SkinnedMesh — looking for any mesh…');
+        model.traverse((child) => {
+          if ((child as any).isMesh && !this.baseGeometry) {
+            const m = child as THREE.Mesh;
+            this.baseGeometry = m.geometry;
+            this.baseMaterial = m.material as THREE.MeshStandardMaterial;
+            console.log('[CharacterManager] Using non-skinned mesh fallback');
+          }
+        });
+      }
     } catch (err) {
-      console.error("Failed to load character:", err);
+      console.error('[CharacterManager] Failed to load character model:', err);
     }
+
+    // ── FALLBACK: if no geometry was obtained, create simple capsules ──
+    if (!this.baseGeometry) {
+      console.warn('[CharacterManager] Using fallback CapsuleGeometry');
+      this.baseGeometry = new THREE.CapsuleGeometry(0.2, 0.6, 4, 8);
+      this.baseMaterial = new THREE.MeshStandardMaterial({ color: 0x4ade80 });
+    }
+
+    // Always create instances — agents must be visible regardless of model quality
+    this.initInstances();
+    this.isLoaded = true;
+    console.log('[CharacterManager] Ready — instances:', this.instanceCount,
+      'hasAnimations:', !!(this.bakedWalkBuffer && this.bakedIdleBuffer && this.bakedWaveBuffer));
   }
 
   public setInstanceCount(count: number) {
@@ -138,8 +171,14 @@ export class CharacterManager {
   }
 
   public updateWorldSize(size: number) {
+    const changed = this.worldSize !== size;
     this.uWorldSize.value = size;
     this.worldSize = size;
+    // Reinitialize spawn positions if already loaded and the world size changed
+    if (changed && this.isLoaded) {
+      this.cleanupInstances();
+      this.initInstances();
+    }
   }
 
   /**
@@ -158,9 +197,24 @@ export class CharacterManager {
     return this.debugPosArray;
   }
 
+  private _firstUpdate = true;
   public update(delta: number, renderer: any) {
     if (this.computeNode) {
-      renderer.compute(this.computeNode);
+      try {
+        renderer.compute(this.computeNode);
+        if (this._firstUpdate) {
+          console.log('[CharacterManager] First compute dispatch OK');
+          this._firstUpdate = false;
+        }
+      } catch (err) {
+        if (this._firstUpdate) {
+          console.error('[CharacterManager] Compute failed:', err);
+          this._firstUpdate = false;
+        }
+      }
+    } else if (this._firstUpdate) {
+      console.warn('[CharacterManager] update() called but no computeNode');
+      this._firstUpdate = false;
     }
   }
 
@@ -173,7 +227,11 @@ export class CharacterManager {
   }
 
   private initInstances() {
-    if (!this.baseGeometry || !this.baseMaterial) return;
+    if (!this.baseGeometry || !this.baseMaterial) {
+      console.error('[CharacterManager] initInstances called without geometry/material');
+      return;
+    }
+    console.log('[CharacterManager] initInstances — count:', this.instanceCount, 'worldSize:', this.worldSize);
 
     const posArray = new Float32Array(this.instanceCount * 4);
     const velArray = new Float32Array(this.instanceCount * 4);
@@ -181,22 +239,60 @@ export class CharacterManager {
     const colorArray = new Float32Array(this.instanceCount * 3);
 
     const tempColor = new THREE.Color();
-    const spawnRadius = this.worldSize;
+
+    // Board perimeter tile positions — same formula as BehaviorManager.getTilePosition
+    const NUM_BOARD_TILES = 32;
+    const tileSize = (this.worldSize * 2) / 9;
+    const halfWorld = this.worldSize;
+
+    const getBoardTilePos = (tileIdx: number) => {
+      const t = tileIdx % NUM_BOARD_TILES;
+      let tx = 0, tz = 0;
+      if (t < 9) {
+        tx = halfWorld - (t * tileSize);
+        tz = halfWorld;
+      } else if (t < 17) {
+        tx = -halfWorld;
+        tz = halfWorld - ((t - 8) * tileSize);
+      } else if (t < 25) {
+        tx = -halfWorld + ((t - 16) * tileSize);
+        tz = -halfWorld;
+      } else {
+        tx = halfWorld;
+        tz = -halfWorld + ((t - 24) * tileSize);
+      }
+      return { x: tx, z: tz };
+    };
+
+    // Deterministic pseudo-random matching BehaviorManager jitter
+    const seededRand = (seed: number) => {
+      const x = Math.sin(seed + 1) * 43758.5453123;
+      return x - Math.floor(x);
+    };
 
     for (let i = 0; i < this.instanceCount; i++) {
       const agent = AGENTS[i] || AGENTS[0];
       tempColor.set(agent.color);
 
       if (i === PLAYER_INDEX) {
-        posArray[i * 4 + 0] = 0;
-        posArray[i * 4 + 2] = 0;
+        // Player starts at GENESIS tile (tile 0 — top-right corner)
+        const genesis = getBoardTilePos(0);
+        posArray[i * 4 + 0] = genesis.x;
+        posArray[i * 4 + 2] = genesis.z;
         posArray[i * 4 + 3] = 1;
       } else {
-        posArray[i * 4 + 0] = (Math.random() - 0.5) * spawnRadius * 2;
-        posArray[i * 4 + 2] = (Math.random() - 0.5) * spawnRadius * 2;
+        // Distribute NPCs evenly around the board perimeter tiles
+        const startTile = (i - 1) % NUM_BOARD_TILES;
+        const tilePos = getBoardTilePos(startTile);
+        // Jitter only along the edge so agents stay on the board perimeter
+        const isHorizontalEdge = startTile < 9 || (startTile >= 17 && startTile < 25);
+        const jitter = (seededRand(i * 3 + 1) - 0.5) * tileSize * 0.35;
+        posArray[i * 4 + 0] = tilePos.x + (isHorizontalEdge ? jitter : 0);
+        posArray[i * 4 + 2] = tilePos.z + (isHorizontalEdge ? 0 : jitter);
         posArray[i * 4 + 3] = 1;
-        velArray[i * 4 + 0] = (Math.random() - 0.5) * 0.1;
-        velArray[i * 4 + 2] = (Math.random() - 0.5) * 0.1;
+        // Small initial velocity along the board edge
+        velArray[i * 4 + 0] = (isHorizontalEdge ? -0.01 : 0);
+        velArray[i * 4 + 2] = (isHorizontalEdge ? 0 : -0.01);
 
         // Adjust color based on risk level
         if (agent.riskLevel === 'Degen') {
@@ -222,14 +318,24 @@ export class CharacterManager {
     this.positionStorage = storage(this.posAttribute, 'vec4', this.instanceCount);
     this.velocityStorage = storage(this.velAttribute, 'vec4', this.instanceCount);
 
-    // Agent state buffer — player starts FROZEN, NPCs start BOIDS (0 = default)
-    // Create BEFORE initComputeNode so the storage node is ready, and set
-    // needsUpdate AFTER the attribute is constructed to force the initial upload.
+    // Agent state buffer — player starts FROZEN, NPCs start FROZEN (safe default).
+    // BehaviorManager will override to GOTO once it is constructed, but this
+    // ensures the very first GPU frame doesn't scatter agents via BOIDS.
     this.agentStateBuffer = new AgentStateBuffer(this.instanceCount);
     this.agentStateBuffer.setState(PLAYER_INDEX, AgentBehavior.FROZEN);
+    for (let i = 1; i < this.instanceCount; i++) {
+      // Pre-set each NPC's waypoint to its spawn position so GOTO works immediately
+      const startTile = (i - 1) % NUM_BOARD_TILES;
+      const tp = getBoardTilePos(startTile);
+      const isH = startTile < 9 || (startTile >= 17 && startTile < 25);
+      const j = (seededRand(i * 3 + 1) - 0.5) * tileSize * 0.35;
+      this.agentStateBuffer.setWaypoint(i, tp.x + (isH ? j : 0), tp.z + (isH ? 0 : j));
+      this.agentStateBuffer.setState(i, AgentBehavior.GOTO);
+    }
 
     this.initComputeNode();
     this.createInstancedMesh();
+    console.log('[CharacterManager] initInstances complete — mesh added to scene:', !!this.instancedMesh);
   }
 
   private initComputeNode() {
@@ -254,7 +360,7 @@ export class CharacterManager {
           const toTarget = waypointXZ.sub(pos);
           const dist = toTarget.length();
           If(dist.greaterThan(float(0.2)), () => {
-            const gotoVel = toTarget.normalize().mul(this.uSpeed.mul(3.0));
+            const gotoVel = toTarget.normalize().mul(this.uSpeed.mul(4.0));
             velElement.assign(vec4(gotoVel, 0.0));
             posElement.assign(vec4(pos.add(gotoVel), 1.0));
           }).Else(() => {
@@ -336,6 +442,7 @@ export class CharacterManager {
     this.instancedMesh.castShadow = true;
     this.instancedMesh.receiveShadow = true;
     this.scene.add(this.instancedMesh);
+    console.log('[CharacterManager] Instanced mesh added — vertices:', instancedGeometry.getAttribute('position')?.count, 'instanceCount:', instancedGeometry.instanceCount);
   }
 
   private createVertexNode() {

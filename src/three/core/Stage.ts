@@ -18,7 +18,7 @@ export class Stage {
     this.scene.background = new THREE.Color(0x0a0a0a);
 
     this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 500);
-    this.camera.position.set(10, 8, 15);
+    this.camera.position.set(0, 55, 38); // Board overview: see full 50×50 perimeter
 
     this.controls = new OrbitControls(this.camera, rendererElement);
     this.controls.enableDamping = true;
@@ -30,8 +30,8 @@ export class Stage {
     this.controls.minPolarAngle = Math.PI / 4.5;
     this.controls.maxPolarAngle = Math.PI / 2.4;
     this.controls.minDistance = 3;
-    this.controls.maxDistance = 50; // Increased to allow viewing larger worlds
-    this.controls.target.set(0, 0.8, 0);
+    this.controls.maxDistance = 90; // Allow zooming out far enough to see the full board
+    this.controls.target.set(0, 0, 0); // Center on the board
 
     this.controls.addEventListener('start', () => {
       rendererElement.style.cursor = 'grabbing';

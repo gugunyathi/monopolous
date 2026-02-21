@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ZoomIn, ZoomOut, Maximize, Minimize } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, Minimize, ScanLine } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { motion } from 'motion/react';
 
@@ -29,6 +29,11 @@ const CameraControls: React.FC = () => {
     window.dispatchEvent(event);
   };
 
+  const handleOverview = () => {
+    const event = new CustomEvent('camera-overview');
+    window.dispatchEvent(event);
+  };
+
   return (
     <motion.div 
       initial={{ x: 100, opacity: 0 }}
@@ -48,6 +53,13 @@ const CameraControls: React.FC = () => {
         title="Zoom Out"
       >
         <ZoomOut size={20} />
+      </button>
+      <button 
+        onClick={handleOverview}
+        className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-xl border border-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all"
+        title="View Whole Board"
+      >
+        <ScanLine size={20} />
       </button>
       <button 
         onClick={handleTopDown}

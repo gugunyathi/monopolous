@@ -24,7 +24,7 @@ export class AgentStateBuffer {
   /** TSL storage node — bind directly in initComputeNode. */
   public readonly storageNode: any;
 
-  constructor(private readonly count: number) {
+  constructor(public readonly count: number) {
     this.array = new Float32Array(count * 4);
     this.attribute = new THREE.StorageInstancedBufferAttribute(this.array, 4);
     this.storageNode = storage(this.attribute, 'vec4', count);

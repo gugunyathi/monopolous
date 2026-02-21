@@ -1,151 +1,176 @@
-import * as THREE from 'three/webgpu';
 import { AgentBehavior, ActiveEncounter } from '../../types';
 import { AgentStateBuffer } from './AgentStateBuffer';
 import { AgentData, PLAYER_INDEX } from '../../data/agents';
 import { useStore } from '../../store/useStore';
 
 // ── Tuning constants ─────────────────────────────────────────
-const NPC_COLLISION_RADIUS = 0.8;          // world units — NPC↔NPC freeze trigger
-const PLAYER_ENCOUNTER_RADIUS = 1.5;       // world units — player↔NPC chat trigger
-const PLAYER_ARRIVAL_RADIUS = 0.3;         // world units — GOTO waypoint reached
-const FROZEN_DURATION_MS = 4000;           // ms NPCs stay frozen after a collision
-const MAX_FROZEN_PAIRS = 10;               // cap simultaneous NPC↔NPC frozen pairs
-const UNFREEZE_COOLDOWN_MS = 800;          // ms after unfreeze before NPC can re-collide
-
-interface FrozenPair {
-  a: number;
-  b: number;
-  expiresAt: number;
-}
+const PLAYER_ENCOUNTER_RADIUS = 2.5;       // world units — player↔NPC proximity trigger
+const ARRIVAL_RADIUS = 0.5;                // world units — waypoint considered "reached"
+const TILE_PAUSE_MIN_MS = 400;             // ms an NPC pauses on a tile before moving on
+const TILE_PAUSE_MAX_MS = 1800;            // ms maximum pause on a tile
+const SAME_TILE_CHAT_MS = 2500;            // ms two NPCs "chat" when on the same tile
+const NUM_BOARD_TILES = 32;                // perimeter tiles on the board
+const TILE_JITTER = 0.35;                  // fraction of tileSize — keeps agents visually on their tile
 
 export class BehaviorManager {
-  private frozenPairs = new Map<string, FrozenPair>();
-  private frozenIndices = new Set<number>();
-  private unfreezeTimestamps = new Map<number, number>(); // index → time of last unfreeze
+  private npcTileIndex = new Map<number, number>();      // current tile the NPC is at
+  private npcDestTile = new Map<number, number>();       // final destination tile after dice roll
+  private npcArrivalTime = new Map<number, number>();
+  private npcPauseDuration = new Map<number, number>();
+  private npcJitter = new Map<number, { x: number; z: number }>();
+
+  private chatNPC: number | null = null;
   private currentEncounterNPC: number | null = null;
-  private chatNPC: number | null = null; // NPC player is currently moving to talk to
+  private worldSize = 25;
+  private tileSize = 0;
 
   constructor(
     private stateBuffer: AgentStateBuffer,
     private agents: AgentData[],
     private onEncounterChange: (encounter: ActiveEncounter | null) => void,
   ) {
-    // Player starts FROZEN (idle) — user activates it with a floor click (GOTO)
+    const { worldSize } = useStore.getState();
+    this.worldSize = worldSize;
+    this.tileSize = (worldSize * 2) / 9;
+
     stateBuffer.setState(PLAYER_INDEX, AgentBehavior.FROZEN);
-    // All NPCs start in BOIDS mode (resetAllNPCsToState is called with default 0 values already)
+
+    const count = stateBuffer.count;
+    for (let i = 1; i < count; i++) {
+      const startTile = (i - 1) % NUM_BOARD_TILES;
+      this.npcTileIndex.set(i, startTile);
+      // Jitter only along the edge direction so agents don't step off the board
+      const isHorizontalEdge = startTile < 9 || (startTile >= 17 && startTile < 25);
+      const j = (this.seededRand(i * 3 + 1) - 0.5) * this.tileSize * TILE_JITTER;
+      this.npcJitter.set(i, {
+        x: isHorizontalEdge ? j : 0,
+        z: isHorizontalEdge ? 0 : j,
+      });
+
+      // Give each NPC an immediate dice roll so they start walking right away
+      // Stagger by using a seeded roll (1-6) so they don't all walk the same distance
+      const initialRoll = 1 + Math.floor(this.seededRand(i * 7 + 3) * 6);
+      const destTile = (startTile + initialRoll) % NUM_BOARD_TILES;
+      this.npcDestTile.set(i, destTile);
+
+      // Start walking to the next tile immediately
+      const nextTile = (startTile + 1) % NUM_BOARD_TILES;
+      this.npcTileIndex.set(i, nextTile);
+      const pos = this.getTilePos(nextTile);
+      const jitter = this.npcJitter.get(i)!;
+      // Apply jitter along the correct axis for the next tile
+      const nextIsH = nextTile < 9 || (nextTile >= 17 && nextTile < 25);
+      const mag = Math.abs(jitter.x) > 0 ? jitter.x : jitter.z;
+      stateBuffer.setWaypoint(i, pos.x + (nextIsH ? mag : 0), pos.z + (nextIsH ? 0 : mag));
+      stateBuffer.setState(i, AgentBehavior.GOTO);
+    }
+    console.log('[BehaviorManager] Initialized', count - 1, 'NPCs with immediate walking destinations');
   }
 
-  // ─────────────────────────────────────────────────────────────
-  //  Per-frame update  (call after GPU readback)
-  // ─────────────────────────────────────────────────────────────
+  private seededRand(seed: number): number {
+    const x = Math.sin(seed + 1) * 43758.5453123;
+    return x - Math.floor(x);
+  }
+
   public update(positions: Float32Array): void {
     const now = Date.now();
-    const count = this.agents.length;
+    const count = this.stateBuffer.count;
+    const { worldSize } = useStore.getState();
+    this.worldSize = worldSize;
+    this.tileSize = (worldSize * 2) / 9;
 
-    // 1. Expire frozen NPC pairs
-    for (const [key, pair] of this.frozenPairs) {
-      if (now > pair.expiresAt) {
-        this.stateBuffer.setState(pair.a, AgentBehavior.BOIDS);
-        this.stateBuffer.setState(pair.b, AgentBehavior.BOIDS);
-        
-        this.frozenIndices.delete(pair.a);
-        this.frozenIndices.delete(pair.b);
-        this.unfreezeTimestamps.set(pair.a, now);
-        this.unfreezeTimestamps.set(pair.b, now);
-        this.frozenPairs.delete(key);
-      }
-    }
-
-    // 2. Randomly make agents move to board tiles
-    const { boardTiles, worldSize } = useStore.getState();
+    // ── 1. NPC board-path movement ───────────────────────────
     for (let i = 1; i < count; i++) {
-      if (this.stateBuffer.getState(i) === AgentBehavior.BOIDS && Math.random() > 0.999) {
-        const randomTileIdx = Math.floor(Math.random() * boardTiles.length);
-        const pos = this.getTilePosition(randomTileIdx, boardTiles.length, worldSize);
-        this.stateBuffer.setWaypoint(i, pos.x, pos.z);
-        this.stateBuffer.setState(i, AgentBehavior.GOTO);
-      }
+      const state = this.stateBuffer.getState(i);
 
-      // Check for arrival at waypoint
-      if (this.stateBuffer.getState(i) === AgentBehavior.GOTO && i !== PLAYER_INDEX) {
+      if (state === AgentBehavior.GOTO) {
         const wp = this.stateBuffer.getWaypoint(i);
         const dx = wp.x - positions[i * 4];
         const dz = wp.z - positions[i * 4 + 2];
-        if (dx * dx + dz * dz < PLAYER_ARRIVAL_RADIUS * PLAYER_ARRIVAL_RADIUS) {
-          this.stateBuffer.setState(i, AgentBehavior.BOIDS);
-        }
-      }
-    }
+        if (dx * dx + dz * dz < ARRIVAL_RADIUS * ARRIVAL_RADIUS) {
+          // Arrived at current tile — check if there are more tiles to walk through
+          const currentTile = this.npcTileIndex.get(i) ?? 0;
+          const destTile = this.npcDestTile.get(i) ?? currentTile;
 
-    // Clean up expired cooldowns
-    for (const [idx, ts] of this.unfreezeTimestamps) {
-      if (now - ts > UNFREEZE_COOLDOWN_MS) this.unfreezeTimestamps.delete(idx);
-    }
-
-    // 2. Detect new NPC↔NPC collisions (skip index 0 = player)
-    if (this.frozenPairs.size < MAX_FROZEN_PAIRS) {
-      for (let i = 1; i < count - 1; i++) {
-        if (this.frozenIndices.has(i)) continue;
-        if (this.stateBuffer.getState(i) !== AgentBehavior.BOIDS) continue;
-        if (this.unfreezeTimestamps.has(i)) continue; // cooling down
-
-        for (let j = i + 1; j < count; j++) {
-          if (this.frozenIndices.has(j)) continue;
-          if (this.stateBuffer.getState(j) !== AgentBehavior.BOIDS) continue;
-          if (this.unfreezeTimestamps.has(j)) continue; // cooling down
-
-          const dx = positions[i * 4] - positions[j * 4];
-          const dz = positions[i * 4 + 2] - positions[j * 4 + 2];
-
-          if (dx * dx + dz * dz < NPC_COLLISION_RADIUS * NPC_COLLISION_RADIUS) {
+          if (currentTile !== destTile) {
+            // Advance one tile along the perimeter toward destination
+            const nextTile = (currentTile + 1) % NUM_BOARD_TILES;
+            this.npcTileIndex.set(i, nextTile);
+            const pos = this.getTilePos(nextTile);
+            const jitter = this.getJitterForTile(i, nextTile);
+            this.stateBuffer.setWaypoint(i, pos.x + jitter.x, pos.z + jitter.z);
+            // Keep GOTO state — continue walking
+          } else {
+            // Reached final destination tile — pause here
             this.stateBuffer.setState(i, AgentBehavior.FROZEN);
-            this.stateBuffer.setState(j, AgentBehavior.FROZEN);
-
-            // Set NPCs to face each other using the waypoint fields (used for facing when FROZEN)
-            const dirX = positions[j * 4] - positions[i * 4];
-            const dirZ = positions[j * 4 + 2] - positions[i * 4 + 2];
-            this.stateBuffer.setWaypoint(i, dirX, dirZ);
-            this.stateBuffer.setWaypoint(j, -dirX, -dirZ);
-
-            this.frozenIndices.add(i);
-            this.frozenIndices.add(j);
-            const key = `${i}-${j}`;
-            this.frozenPairs.set(key, { a: i, b: j, expiresAt: now + FROZEN_DURATION_MS });
-
-            if (this.frozenPairs.size >= MAX_FROZEN_PAIRS) break;
+            this.npcArrivalTime.set(i, now);
+            const pause = TILE_PAUSE_MIN_MS + Math.random() * (TILE_PAUSE_MAX_MS - TILE_PAUSE_MIN_MS);
+            this.npcPauseDuration.set(i, pause);
           }
         }
-        if (this.frozenPairs.size >= MAX_FROZEN_PAIRS) break;
+      } else if (state === AgentBehavior.FROZEN) {
+        const arrivalTime = this.npcArrivalTime.get(i);
+        if (arrivalTime === undefined) continue; // player-controlled freeze
+
+        const pause = this.npcPauseDuration.get(i) ?? TILE_PAUSE_MIN_MS;
+
+        // Face others on same tile
+        const myTile = this.npcTileIndex.get(i) ?? 0;
+        let inTileChat = false;
+        for (let j = 1; j < count; j++) {
+          if (j === i) continue;
+          if (this.stateBuffer.getState(j) !== AgentBehavior.FROZEN) continue;
+          if (this.npcArrivalTime.get(j) === undefined) continue;
+          if ((this.npcTileIndex.get(j) ?? -1) !== myTile) continue;
+          const dirX = positions[j * 4] - positions[i * 4];
+          const dirZ = positions[j * 4 + 2] - positions[i * 4 + 2];
+          if (Math.abs(dirX) + Math.abs(dirZ) > 0.01) {
+            this.stateBuffer.setWaypoint(i, dirX, dirZ);
+          }
+          inTileChat = true;
+          break;
+        }
+
+        const effectivePause = inTileChat ? Math.max(pause, SAME_TILE_CHAT_MS) : pause;
+
+        if (now - arrivalTime >= effectivePause) {
+          // Roll dice and start walking tile-by-tile toward the destination
+          const roll = 1 + Math.floor(Math.random() * 6);
+          const currentTile = this.npcTileIndex.get(i) ?? 0;
+          const destTile = (currentTile + roll) % NUM_BOARD_TILES;
+          this.npcDestTile.set(i, destTile);
+          this.npcArrivalTime.delete(i);
+          this.npcPauseDuration.delete(i);
+
+          // Walk to the very next tile first (one step at a time along the perimeter)
+          const nextTile = (currentTile + 1) % NUM_BOARD_TILES;
+          this.npcTileIndex.set(i, nextTile);
+          const pos = this.getTilePos(nextTile);
+          const jitter = this.getJitterForTile(i, nextTile);
+          this.stateBuffer.setWaypoint(i, pos.x + jitter.x, pos.z + jitter.z);
+          this.stateBuffer.setState(i, AgentBehavior.GOTO);
+        }
       }
     }
 
-    // 3. Detect player GOTO arrival
+    // ── 2. Player GOTO arrival ───────────────────────────────
     if (this.stateBuffer.getState(PLAYER_INDEX) === AgentBehavior.GOTO) {
       const wp = this.stateBuffer.getWaypoint(PLAYER_INDEX);
       const pdx = wp.x - positions[PLAYER_INDEX * 4];
       const pdz = wp.z - positions[PLAYER_INDEX * 4 + 2];
-      if (pdx * pdx + pdz * pdz < PLAYER_ARRIVAL_RADIUS * PLAYER_ARRIVAL_RADIUS) {
+      if (pdx * pdx + pdz * pdz < ARRIVAL_RADIUS * ARRIVAL_RADIUS) {
         this.stateBuffer.setState(PLAYER_INDEX, AgentBehavior.FROZEN);
-        
         if (this.chatNPC !== null) {
-          // Face the NPC we came to talk to
           const nx = positions[this.chatNPC * 4];
           const nz = positions[this.chatNPC * 4 + 2];
-          const fx = nx - positions[PLAYER_INDEX * 4];
-          const fz = nz - positions[PLAYER_INDEX * 4 + 2];
-          this.stateBuffer.setWaypoint(PLAYER_INDEX, fx, fz);
-          
-          // Notify store that chat has officially started (arrival)
-          useStore.getState().setAnimation('Wave'); // Optional: greeting animation
+          this.stateBuffer.setWaypoint(PLAYER_INDEX, nx - positions[PLAYER_INDEX * 4], nz - positions[PLAYER_INDEX * 4 + 2]);
+          useStore.getState().setAnimation('Wave');
           this.chatNPC = null;
-        } else {
-          // Store the arrival direction in the waypoint fields (now used for facing)
-          this.stateBuffer.setWaypoint(PLAYER_INDEX, pdx, pdz);
         }
       }
     }
 
-    // 4. Detect player↔NPC proximity (encounter)
+    // ── 3. Player↔NPC proximity encounter ───────────────────
     const px = positions[PLAYER_INDEX * 4];
     const pz = positions[PLAYER_INDEX * 4 + 2];
     let nearestNPC: number | null = null;
@@ -155,10 +180,7 @@ export class BehaviorManager {
       const dx = px - positions[i * 4];
       const dz = pz - positions[i * 4 + 2];
       const d2 = dx * dx + dz * dz;
-      if (d2 < nearestDist2) {
-        nearestDist2 = d2;
-        nearestNPC = i;
-      }
+      if (d2 < nearestDist2) { nearestDist2 = d2; nearestNPC = i; }
     }
 
     if (nearestNPC !== this.currentEncounterNPC) {
@@ -178,13 +200,8 @@ export class BehaviorManager {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────
-  //  External actions
-  // ─────────────────────────────────────────────────────────────
-
-  /** Called when user clicks on the floor while player is selected. */
   public setPlayerWaypoint(x: number, z: number): void {
-    this.chatNPC = null; // Cancel any pending chat
+    this.chatNPC = null;
     this.stateBuffer.setWaypoint(PLAYER_INDEX, x, z);
     this.stateBuffer.setState(PLAYER_INDEX, AgentBehavior.GOTO);
   }
@@ -192,73 +209,66 @@ export class BehaviorManager {
   public startChat(npcIndex: number, positions: Float32Array): void {
     const nx = positions[npcIndex * 4];
     const nz = positions[npcIndex * 4 + 2];
-    
     const px = positions[PLAYER_INDEX * 4];
     const pz = positions[PLAYER_INDEX * 4 + 2];
-    
+
     let dx = px - nx;
     let dz = pz - nz;
     const dist = Math.sqrt(dx * dx + dz * dz);
-    
-    if (dist < 0.01) {
-      dx = 1;
-      dz = 0;
-    } else {
-      dx /= dist;
-      dz /= dist;
-    }
-    
-    // Target position for player: 1.2 units away from NPC
-    const targetX = nx + dx * 1.2;
-    const targetZ = nz + dz * 1.2;
-    
-    this.stateBuffer.setWaypoint(PLAYER_INDEX, targetX, targetZ);
+    if (dist < 0.01) { dx = 1; dz = 0; } else { dx /= dist; dz /= dist; }
+
+    this.stateBuffer.setWaypoint(PLAYER_INDEX, nx + dx * 1.2, nz + dz * 1.2);
     this.stateBuffer.setState(PLAYER_INDEX, AgentBehavior.GOTO);
     this.chatNPC = npcIndex;
-    
-    // Freeze NPC and set it to face the player's future position
+
     this.stateBuffer.setState(npcIndex, AgentBehavior.FROZEN);
-    this.stateBuffer.setWaypoint(npcIndex, dx, dz); // Face the player
-    
-    // Break any existing pair
-    for (const [key, pair] of this.frozenPairs) {
-      if (pair.a === npcIndex || pair.b === npcIndex) {
-        const other = pair.a === npcIndex ? pair.b : pair.a;
-        this.stateBuffer.setState(other, AgentBehavior.BOIDS);
-        this.frozenIndices.delete(pair.a);
-        this.frozenIndices.delete(pair.b);
-        this.frozenPairs.delete(key);
-        break;
-      }
-    }
+    this.stateBuffer.setWaypoint(npcIndex, dx, dz);
+    this.npcArrivalTime.set(npcIndex, Date.now());
+    this.npcPauseDuration.set(npcIndex, 999999);
   }
 
   public endChat(npcIndex: number | null): void {
     this.chatNPC = null;
     if (npcIndex !== null) {
-      this.stateBuffer.setState(npcIndex, AgentBehavior.BOIDS);
+      const currentTile = this.npcTileIndex.get(npcIndex) ?? 0;
+      const pos = this.getTilePos(currentTile);
+      const jitter = this.npcJitter.get(npcIndex) ?? { x: 0, z: 0 };
+      this.stateBuffer.setWaypoint(npcIndex, pos.x + jitter.x, pos.z + jitter.z);
+      this.stateBuffer.setState(npcIndex, AgentBehavior.GOTO);
+      this.npcArrivalTime.delete(npcIndex);
+      this.npcPauseDuration.delete(npcIndex);
     }
     this.stateBuffer.setState(PLAYER_INDEX, AgentBehavior.FROZEN);
   }
 
-  private getTilePosition(index: number, totalTiles: number, worldSize: number) {
-    const tileSize = (worldSize * 2) / 9;
-    const halfWorld = worldSize;
+  private getTilePos(tileIndex: number): { x: number; z: number } {
+    const t = ((tileIndex % NUM_BOARD_TILES) + NUM_BOARD_TILES) % NUM_BOARD_TILES;
+    const halfWorld = this.worldSize;
+    const ts = this.tileSize;
     let x = 0, z = 0;
-
-    if (index < 9) {
-      x = halfWorld - (index * tileSize);
-      z = halfWorld;
-    } else if (index < 17) {
-      x = -halfWorld;
-      z = halfWorld - ((index - 8) * tileSize);
-    } else if (index < 25) {
-      x = -halfWorld + ((index - 16) * tileSize);
-      z = -halfWorld;
+    if (t < 9) {
+      x = halfWorld - (t * ts); z = halfWorld;
+    } else if (t < 17) {
+      x = -halfWorld; z = halfWorld - ((t - 8) * ts);
+    } else if (t < 25) {
+      x = -halfWorld + ((t - 16) * ts); z = -halfWorld;
     } else {
-      x = halfWorld;
-      z = -halfWorld + ((index - 24) * tileSize);
+      x = halfWorld; z = -halfWorld + ((t - 24) * ts);
     }
     return { x, z };
+  }
+
+  /** Edge-aware jitter: spread only along the edge direction for a given tile */
+  private getJitterForTile(agentIndex: number, tileIndex: number): { x: number; z: number } {
+    const t = ((tileIndex % NUM_BOARD_TILES) + NUM_BOARD_TILES) % NUM_BOARD_TILES;
+    const isHorizontalEdge = t < 9 || (t >= 17 && t < 25);
+    const base = this.npcJitter.get(agentIndex);
+    if (!base) return { x: 0, z: 0 };
+    // Use the agent's seeded jitter magnitude but apply it along the correct axis
+    const mag = Math.abs(base.x) > 0 ? base.x : base.z;
+    return {
+      x: isHorizontalEdge ? mag : 0,
+      z: isHorizontalEdge ? 0 : mag,
+    };
   }
 }

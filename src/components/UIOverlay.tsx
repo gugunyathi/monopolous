@@ -5,7 +5,7 @@ import DebugPanel from './DebugPanel';
 import HelpModal from './HelpModal';
 import ChatPanel from './ChatPanel';
 import { AGENTS } from '../data/agents';
-import { HelpCircle, LayoutGrid, Users, Play } from 'lucide-react';
+import { LayoutGrid, Users, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 import SocialFeed from './SocialFeed';
@@ -166,26 +166,7 @@ const UIOverlay: React.FC = () => {
       )}
 
       {/* Top Header */}
-      <div className="flex justify-between items-start relative z-30">
-        <div className="bg-white p-6 rounded-[32px] border border-black/5 shadow-xl max-w-[340px] pointer-events-auto flex gap-4">
-          <div className="w-2.5 h-10 bg-[#7EACEA] rounded-full shrink-0 mt-1" />
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-2xl font-black text-zinc-900 tracking-tight">FakeClaw Inc.</h1>
-              <button
-                onClick={() => setHelpOpen(true)}
-                className="text-zinc-300 hover:text-zinc-500 transition-colors"
-              >
-                <HelpCircle size={22} strokeWidth={2} />
-              </button>
-            </div>
-            <p className="text-[13px] text-zinc-400 font-medium leading-snug">
-              Autonomous corporate agent simulation powered by <a href="https://threejs.org" target="_blank" rel="noopener noreferrer" className="underline decoration-zinc-300 underline-offset-2 hover:text-zinc-600">three.js</a> WebGPU renderer
-            </p>
-          </div>
-        </div>
-
-        {/* Debug Button */}
+      <div className="flex justify-end items-start relative z-30">
         <button
           onClick={toggleDebug}
           className={`pointer-events-auto px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 border ${

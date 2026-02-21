@@ -14,8 +14,26 @@ export default defineConfig(({mode}) => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
-    },
-    server: {
+    },    build: {
+      target: 'esnext',
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules/three')) return 'vendor-three';
+            if (id.includes('node_modules/@google/genai')) return 'vendor-genai';
+            if (id.includes('node_modules/motion')) return 'vendor-motion';
+            if (id.includes('node_modules/react-dom')) return 'vendor-react';
+            if (id.includes('node_modules/react')) return 'vendor-react';
+            if (id.includes('node_modules/lucide-react') || id.includes('node_modules/zustand')) return 'vendor-ui';
+            if (id.includes('/src/three/')) return 'scene';
+            if (id.includes('/src/services/')) return 'services';
+            if (id.includes('/src/components/')) return 'components';
+          },
+        },
+      },
+      // three/webgpu is inherently large (~900 kB); silence expected warning
+      chunkSizeWarningLimit: 1000,
+    },    server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',

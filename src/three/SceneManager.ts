@@ -40,15 +40,17 @@ export class SceneManager {
   private async init() {
     await this.engine.init();
     if (this.isDisposed) return;
+    console.log('[SceneManager] Engine ready, loading characters…');
     await this.characters.load();
     if (this.isDisposed) return;
+    console.log('[SceneManager] Characters loaded');
 
     const state = useStore.getState();
 
-    // Initial sync
+    // Initial sync — updateWorldSize FIRST so initInstances uses correct worldSize
+    this.characters.updateWorldSize(state.worldSize);
     this.characters.setInstanceCount(state.instanceCount);
     this.characters.updateBoidsParams(state.boidsParams);
-    this.characters.updateWorldSize(state.worldSize);
     this.stage.updateDimensions(state.worldSize);
 
     this.engine.renderer.setAnimationLoop(this.animate.bind(this));
@@ -62,6 +64,9 @@ export class SceneManager {
         AGENTS,
         (encounter) => useStore.getState().setActiveEncounter(encounter),
       );
+      console.log('[SceneManager] BehaviorManager created — NPC count:', stateBuffer.count);
+    } else {
+      console.error('[SceneManager] No state buffer! BehaviorManager NOT created');
     }
 
     this.inputManager = new InputManager(
@@ -253,8 +258,8 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
     window.addEventListener('camera-reset', () => {
       this.manualCamera = false;
       if (this.stage.controls) {
-        this.stage.camera.position.set(10, 8, 15);
-        this.stage.controls.target.set(0, 0.8, 0);
+        this.stage.camera.position.set(0, 55, 38);
+        this.stage.controls.target.set(0, 0, 0);
         this.stage.controls.minPolarAngle = Math.PI / 4.5;
         this.stage.controls.maxPolarAngle = Math.PI / 2.4;
         this.stage.controls.update();
@@ -267,6 +272,23 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
       if (this.stage.controls) {
         this.stage.camera.position.set(0, 40, 0.1); // Slightly offset Z to avoid gimbal lock
         this.stage.controls.target.set(0, 0, 0);
+        this.stage.controls.minPolarAngle = 0;
+        this.stage.controls.maxPolarAngle = Math.PI / 2;
+        this.stage.controls.update();
+      }
+    });
+
+    window.addEventListener('camera-overview', () => {
+      this.manualCamera = true;
+      this.manualCameraTimer = 600;
+      if (this.stage.controls) {
+        const { worldSize } = useStore.getState();
+        // Position camera high and angled to see the whole board (worldSize radius = 25 → 50×50 board)
+        const h = worldSize * 2.4;
+        const d = worldSize * 1.4;
+        this.stage.camera.position.set(0, h, d);
+        this.stage.controls.target.set(0, 0, 0);
+        // Temporarily unlock polar limits to allow the high overview angle
         this.stage.controls.minPolarAngle = 0;
         this.stage.controls.maxPolarAngle = Math.PI / 2;
         this.stage.controls.update();
@@ -372,7 +394,7 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
       if (this.stage.controls) {
         this.stage.controls.enabled = true;
         this.stage.controls.minDistance = THREE.MathUtils.lerp(this.stage.controls.minDistance, 3, 0.05);
-        this.stage.controls.maxDistance = THREE.MathUtils.lerp(this.stage.controls.maxDistance, 50, 0.05);
+        this.stage.controls.maxDistance = THREE.MathUtils.lerp(this.stage.controls.maxDistance, 90, 0.05);
         this.stage.controls.minPolarAngle = THREE.MathUtils.lerp(this.stage.controls.minPolarAngle, Math.PI / 4.5, 0.05);
         this.stage.controls.maxPolarAngle = THREE.MathUtils.lerp(this.stage.controls.maxPolarAngle, Math.PI / 2.4, 0.05);
       }
