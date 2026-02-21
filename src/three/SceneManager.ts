@@ -1,0 +1,520 @@
+
+import { Engine } from './core/Engine';
+import { Stage } from './core/Stage';
+import { CharacterManager } from './entities/CharacterManager';
+import { Board } from './entities/Board';
+import { InputManager } from './input/InputManager';
+import { BehaviorManager } from './behavior/BehaviorManager';
+import { AGENTS, PLAYER_INDEX } from '../data/agents';
+import { useStore } from '../store/useStore';
+import { AgentBehavior, ChatMessage } from '../types';
+import { geminiService } from '../services/geminiService';
+import * as THREE from 'three/webgpu';
+
+export class SceneManager {
+  private engine: Engine;
+  private stage: Stage;
+  private characters: CharacterManager;
+  private board: Board;
+
+  private inputManager: InputManager | null = null;
+  private behaviorManager: BehaviorManager | null = null;
+  private selectedIndex: number | null = null;
+
+  private frameCount = 0;
+  private lastTime = 0;
+  private socialTimer = 0;
+  private unsubs: (() => void)[] = [];
+  private isDisposed = false;
+  private manualCamera = false;
+  private manualCameraTimer = 0;
+
+  constructor(container: HTMLElement) {
+    this.engine = new Engine(container);
+    this.stage = new Stage(this.engine.renderer.domElement);
+    this.characters = new CharacterManager(this.stage.scene);
+    this.board = new Board(this.stage.scene, useStore.getState().boardTiles, useStore.getState().worldSize);
+    this.init();
+  }
+
+  private async init() {
+    await this.engine.init();
+    if (this.isDisposed) return;
+    await this.characters.load();
+    if (this.isDisposed) return;
+
+    const state = useStore.getState();
+
+    // Initial sync
+    this.characters.setInstanceCount(state.instanceCount);
+    this.characters.updateBoidsParams(state.boidsParams);
+    this.characters.updateWorldSize(state.worldSize);
+    this.stage.updateDimensions(state.worldSize);
+
+    this.engine.renderer.setAnimationLoop(this.animate.bind(this));
+    window.addEventListener('resize', this.onResize.bind(this));
+    this.setupCameraEvents();
+
+    const stateBuffer = this.characters.getAgentStateBuffer();
+    if (stateBuffer) {
+      this.behaviorManager = new BehaviorManager(
+        stateBuffer,
+        AGENTS,
+        (encounter) => useStore.getState().setActiveEncounter(encounter),
+      );
+    }
+
+    this.inputManager = new InputManager(
+      this.engine.renderer.domElement,
+      this.stage.camera,
+      () => this.characters.getCPUPositions(),
+      () => this.characters.getCount(),
+      (index) => {
+        this.selectedIndex = index;
+        // Update store: null = default (follow player), number = selected NPC
+        useStore.getState().setSelectedNpc(index !== PLAYER_INDEX ? index : null);
+        
+        // If we click anywhere (even the same NPC or floor), and we are chatting, end it.
+        // The user wants to end chat when clicking on the scene.
+        if (useStore.getState().isChatting) {
+          useStore.getState().endChat();
+        }
+      },
+      (x, z) => { 
+        const { worldSize } = useStore.getState();
+        // Constrain to grid boundaries
+        if (Math.abs(x) <= worldSize && Math.abs(z) <= worldSize) {
+          this.behaviorManager?.setPlayerWaypoint(x, z); 
+        }
+      },
+      (index, pos) => { useStore.getState().setHoveredNpc(index, pos); },
+      () => {
+        this.manualCamera = true;
+        this.manualCameraTimer = 300;
+      }
+    );
+
+    this.engine.renderer.domElement.addEventListener('wheel', () => {
+      this.manualCamera = true;
+      this.manualCameraTimer = 300;
+    }, { passive: true });
+
+    useStore.setState({
+      startChat: async (index: number) => {
+        const positions = this.characters.getCPUPositions();
+        if (positions) {
+          this.behaviorManager?.startChat(index, positions);
+          useStore.setState({ 
+            isChatting: true,
+            chatMessages: [],
+            isThinking: true
+          });
+
+          // Auto-presentation
+          const agent = AGENTS[index];
+          try {
+            const systemInstruction = `You are ${agent.role} at FakeClaw Inc. 
+Department: ${agent.department}
+Mission: ${agent.mission}
+Personality: ${agent.personality}
+Expertise: ${agent.expertise.join(', ')}
+
+Keep your responses extremely brief (1-2 short sentences max) and professional. Introduce yourself very briefly and ask how you can help.`;
+
+            const responseText = await geminiService.chat(
+              systemInstruction,
+              [],
+              "Hello! Please introduce yourself briefly."
+            );
+
+            const modelMessage: ChatMessage = {
+              role: 'model',
+              text: responseText,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+
+            useStore.setState((s) => ({ 
+              chatMessages: [modelMessage],
+              isThinking: false 
+            }));
+            
+            this.characters.fadeToAction('Wave', index);
+            setTimeout(() => this.characters.fadeToAction('Idle', index), 2000);
+          } catch (error) {
+            console.error("Auto-presentation error:", error);
+            useStore.setState({ isThinking: false });
+          }
+        }
+      },
+      endChat: () => {
+        const { selectedNpcIndex } = useStore.getState();
+        this.behaviorManager?.endChat(selectedNpcIndex);
+        useStore.setState({ 
+          isChatting: false,
+          chatMessages: []
+        });
+      },
+      sendMessage: async (text: string) => {
+        const state = useStore.getState();
+        if (state.selectedNpcIndex === null || state.isThinking) return;
+
+        const agent = AGENTS[state.selectedNpcIndex];
+        const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        const userMessage: ChatMessage = {
+          role: 'user',
+          text,
+          timestamp
+        };
+
+        useStore.setState((s) => ({ 
+          chatMessages: [...s.chatMessages, userMessage],
+          isThinking: true 
+        }));
+
+        try {
+          const systemInstruction = `You are ${agent.role} at FakeClaw Inc. 
+Department: ${agent.department}
+Mission: ${agent.mission}
+Personality: ${agent.personality}
+Expertise: ${agent.expertise.join(', ')}
+
+Keep your responses extremely brief (1-2 short sentences max) and professional, matching your corporate persona.`;
+
+          const responseText = await geminiService.chat(
+            systemInstruction,
+            useStore.getState().chatMessages.slice(0, -1), // History without the last user message
+            text
+          );
+
+          const modelMessage: ChatMessage = {
+            role: 'model',
+            text: responseText,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          };
+
+          useStore.setState((s) => ({ 
+            chatMessages: [...s.chatMessages, modelMessage],
+            isThinking: false 
+          }));
+          
+          this.characters.fadeToAction('Wave', state.selectedNpcIndex);
+          setTimeout(() => this.characters.fadeToAction('Idle', state.selectedNpcIndex!), 2000);
+
+        } catch (error) {
+          console.error("Gemini Error:", error);
+          useStore.setState({ isThinking: false });
+        }
+      }
+    });
+
+    // Subscriptions
+    const sub1 = useStore.subscribe((state) => {
+      this.characters.fadeToAction(state.currentAction);
+    });
+
+    const sub2 = useStore.subscribe((state, prevState) => {
+      if (state.instanceCount !== prevState.instanceCount) {
+        this.characters.setInstanceCount(state.instanceCount);
+      }
+      // Update Uniforms when params change
+      if (state.boidsParams !== prevState.boidsParams) {
+        this.characters.updateBoidsParams(state.boidsParams);
+      }
+
+      // Update World Size
+      if (state.worldSize !== prevState.worldSize) {
+        this.characters.updateWorldSize(state.worldSize);
+        this.stage.updateDimensions(state.worldSize);
+      }
+    });
+
+    this.unsubs.push(sub1, sub2);
+  }
+
+  private setupCameraEvents() {
+    window.addEventListener('camera-zoom', (e: any) => {
+      this.manualCamera = true;
+      this.manualCameraTimer = 300;
+      if (this.stage.controls) {
+        const delta = e.detail.delta;
+        const offset = new THREE.Vector3();
+        offset.copy(this.stage.camera.position).sub(this.stage.controls.target);
+        
+        const currentDist = offset.length();
+        const newDist = THREE.MathUtils.clamp(currentDist + delta, this.stage.controls.minDistance, this.stage.controls.maxDistance);
+        
+        offset.setLength(newDist);
+        this.stage.camera.position.copy(this.stage.controls.target).add(offset);
+        this.stage.controls.update();
+      }
+    });
+
+    window.addEventListener('camera-reset', () => {
+      this.manualCamera = false;
+      if (this.stage.controls) {
+        this.stage.camera.position.set(10, 8, 15);
+        this.stage.controls.target.set(0, 0.8, 0);
+        this.stage.controls.minPolarAngle = Math.PI / 4.5;
+        this.stage.controls.maxPolarAngle = Math.PI / 2.4;
+        this.stage.controls.update();
+      }
+    });
+
+    window.addEventListener('camera-topdown', () => {
+      this.manualCamera = true;
+      this.manualCameraTimer = 600; // 10 seconds
+      if (this.stage.controls) {
+        this.stage.camera.position.set(0, 40, 0.1); // Slightly offset Z to avoid gimbal lock
+        this.stage.controls.target.set(0, 0, 0);
+        this.stage.controls.minPolarAngle = 0;
+        this.stage.controls.maxPolarAngle = Math.PI / 2;
+        this.stage.controls.update();
+      }
+    });
+  }
+
+  private onResize() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    this.engine.onResize(w, h);
+    this.stage.onResize(w, h);
+  }
+
+  private animate() {
+    this.engine.timer.update();
+    const delta = this.engine.timer.getDelta();
+    const time = this.engine.timer.getElapsed();
+
+    this.stage.update();
+
+    // 1. GPU Update
+    this.characters.update(delta, this.engine.renderer);
+
+    // 2. GPU → CPU readback (async, 1-frame lag). Keeps debugPosArray in sync with the compute shader.
+    //    Used for picking, camera follow, and the debug canvas/markers.
+    const { isDebugOpen } = useStore.getState();
+    this.characters.syncFromGPU(this.engine.renderer).then((positions) => {
+      if (!positions) return;
+      // Run behavior logic with fresh GPU positions
+      this.behaviorManager?.update(positions);
+      if (isDebugOpen) {
+        useStore.getState().setDebugPositions(new Float32Array(positions));
+        const stateBuffer = this.characters.getAgentStateBuffer();
+        if (stateBuffer) {
+          useStore.getState().setDebugStates(new Float32Array(stateBuffer.array));
+        }
+      }
+    });
+
+    // 3. Camera follow: NPC if one is selected, otherwise always follow the player
+    const { isChatting, selectedNpcIndex, setSelectedPosition, viewMode, activeSocialAgentIndex } = useStore.getState();
+    
+    let followIdx = this.selectedIndex ?? PLAYER_INDEX;
+    
+    // Override follow index if in social mode
+    if (viewMode === 'social' && activeSocialAgentIndex !== null) {
+      followIdx = activeSocialAgentIndex;
+    }
+
+    const pos = this.characters.getCPUPosition(followIdx);
+    this.stage.setFollowTarget(pos);
+
+    // Update selected NPC screen position for UI bubble
+    if (selectedNpcIndex !== null && viewMode === 'world') {
+      const npcPos = this.characters.getCPUPosition(selectedNpcIndex);
+      if (npcPos) {
+        const screenPos = npcPos.clone();
+        screenPos.y += 1.3; // CHARACTER_Y_OFFSET + bubble offset
+        screenPos.project(this.stage.camera);
+        
+        const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+        const y = (screenPos.y * -0.5 + 0.5) * window.innerHeight;
+        setSelectedPosition({ x, y });
+      }
+    } else {
+      setSelectedPosition(null);
+    }
+
+    // 4. Chat / Social camera logic
+    if (viewMode === 'social') {
+      if (this.stage.controls) {
+        this.stage.controls.enabled = false;
+        // Close up portrait view
+        this.stage.controls.minDistance = THREE.MathUtils.lerp(this.stage.controls.minDistance, 2.5, 0.1);
+        this.stage.controls.maxDistance = THREE.MathUtils.lerp(this.stage.controls.maxDistance, 2.5, 0.1);
+        // Force a specific angle for TikTok feel (slightly low angle)
+        const targetPolar = Math.PI / 2.2;
+        this.stage.controls.minPolarAngle = THREE.MathUtils.lerp(this.stage.controls.minPolarAngle, targetPolar, 0.05);
+        this.stage.controls.maxPolarAngle = THREE.MathUtils.lerp(this.stage.controls.maxPolarAngle, targetPolar, 0.05);
+      }
+    } else if (isChatting) {
+      // Disable controls while moving to NPC
+      const playerState = this.characters.getAgentState(PLAYER_INDEX);
+      if (playerState === AgentBehavior.GOTO) {
+        if (this.stage.controls) this.stage.controls.enabled = false;
+        // Slow zoom in
+        if (this.stage.controls) {
+          this.stage.controls.minDistance = THREE.MathUtils.lerp(this.stage.controls.minDistance, 4, 0.05);
+          this.stage.controls.maxDistance = THREE.MathUtils.lerp(this.stage.controls.maxDistance, 6, 0.05);
+        }
+      } else {
+        // Re-enable controls once arrived
+        if (this.stage.controls) {
+          this.stage.controls.enabled = true;
+          // Keep it zoomed in but allow some zoom range
+          this.stage.controls.minDistance = THREE.MathUtils.lerp(this.stage.controls.minDistance, 3, 0.05);
+          this.stage.controls.maxDistance = THREE.MathUtils.lerp(this.stage.controls.maxDistance, 10, 0.05);
+        }
+      }
+    } else if (!this.manualCamera) {
+      // Reset camera constraints when not chatting or in social mode
+      if (this.stage.controls) {
+        this.stage.controls.enabled = true;
+        this.stage.controls.minDistance = THREE.MathUtils.lerp(this.stage.controls.minDistance, 3, 0.05);
+        this.stage.controls.maxDistance = THREE.MathUtils.lerp(this.stage.controls.maxDistance, 50, 0.05);
+        this.stage.controls.minPolarAngle = THREE.MathUtils.lerp(this.stage.controls.minPolarAngle, Math.PI / 4.5, 0.05);
+        this.stage.controls.maxPolarAngle = THREE.MathUtils.lerp(this.stage.controls.maxPolarAngle, Math.PI / 2.4, 0.05);
+      }
+    }
+
+    if (this.manualCameraTimer > 0) {
+      this.manualCameraTimer--;
+      if (this.manualCameraTimer === 0) this.manualCamera = false;
+    }
+
+    this.engine.render(this.stage.scene, this.stage.camera);
+
+    this.updateStats(time);
+    this.updateSocialSimulation(delta);
+    this.updateGameSimulation(delta);
+    this.board.update(useStore.getState().boardTiles);
+  }
+
+  private updateGameSimulation(delta: number) {
+    // Periodically update balances and leaderboard
+    if (this.frameCount % 60 === 0) {
+      const count = this.characters.getCount();
+      for (let i = 0; i < count; i++) {
+        // Randomly give some "trading profits"
+        if (Math.random() > 0.95) {
+          useStore.getState().updateBalance(i, Math.floor(Math.random() * 50));
+        }
+        
+        // Randomly buy properties if landing on them (simulated)
+        if (Math.random() > 0.99) {
+          const randomTileIdx = Math.floor(Math.random() * useStore.getState().boardTiles.length);
+          const tile = useStore.getState().boardTiles[randomTileIdx];
+          if (tile.type === 'property') {
+            useStore.getState().buyProperty(i, tile.id);
+          }
+        }
+      }
+      useStore.getState().updateLeaderboard();
+    }
+  }
+
+  private async updateSocialSimulation(delta: number) {
+    this.socialTimer += delta;
+    
+    // Every ~8 seconds, an agent goes live or posts
+    if (this.socialTimer > 8) {
+      this.socialTimer = 0;
+      
+      const count = this.characters.getCount();
+      const randomIdx = Math.floor(Math.random() * (count - 1)) + 1;
+      const agent = AGENTS[randomIdx];
+      
+      const tokens = ['BTC', 'ETH', 'SOL', 'DOGE', 'PEPE', 'WIF', 'BONK', 'JUP'];
+      const token = tokens[Math.floor(Math.random() * tokens.length)];
+      const action = Math.random() > 0.5 ? 'buy' : 'sell';
+
+      try {
+        const systemInstruction = `You are ${agent.role} at FakeClaw Inc. 
+Department: ${agent.department}
+Mission: ${agent.mission}
+Personality: ${agent.personality}
+
+TRADING PROFILE:
+Trader Personality: ${agent.traderPersonality}
+Trading Style: ${agent.tradingStyle}
+Risk Level: ${agent.riskLevel}
+Current Outfit: ${agent.outfit}
+
+You are currently GOING LIVE on a social trading platform. 
+Generate a very short, high-energy TikTok-style caption (1 sentence) about why you are ${action}ing ${token} right now. 
+Your tone MUST reflect your Trader Personality and Risk Level.
+Include 2-3 relevant emojis. Be professional but "social media" savvy.`;
+
+        const content = await geminiService.chat(
+          systemInstruction,
+          [],
+          `I am ${action}ing ${token}. Give me a caption.`
+        );
+
+        const post: any = {
+          id: Math.random().toString(36).substr(2, 9),
+          agentIndex: randomIdx,
+          type: 'live',
+          isLive: true,
+          content,
+          token,
+          action,
+          likes: Math.floor(Math.random() * 100),
+          comments: [],
+          timestamp: Date.now()
+        };
+
+        useStore.getState().addPost(post);
+        
+        // Force agent to WAVE state for the "Live" session
+        this.characters.fadeToAction('Wave', randomIdx);
+        
+        // Occasionally add a comment from another agent
+        setTimeout(() => {
+          const commenterIdx = Math.floor(Math.random() * (count - 1)) + 1;
+          const commenter = AGENTS[commenterIdx];
+          useStore.getState().addComment(post.id, {
+            id: Math.random().toString(36).substr(2, 9),
+            agentIndex: commenterIdx,
+            text: `LFG! 🚀 ${commenter.role} approved.`,
+            timestamp: Date.now()
+          });
+        }, 3000);
+
+      } catch (error) {
+        console.error("Social simulation error:", error);
+      }
+    }
+  }
+
+  private updateStats(time: number) {
+    this.frameCount++;
+    if (this.frameCount >= 20) {
+      const fps = Math.round(20 / (time - this.lastTime));
+      const info = this.engine.renderer.info;
+      const count = this.characters.getCount();
+
+      useStore.getState().updatePerformance({
+        fps,
+        drawCalls: info.render.drawCalls,
+        triangles: info.render.triangles,
+        geometries: info.memory.geometries,
+        textures: info.memory.textures,
+        entities: count
+      });
+
+      this.frameCount = 0;
+      this.lastTime = time;
+    }
+  }
+
+  public dispose() {
+    this.isDisposed = true;
+    this.unsubs.forEach(unsub => unsub());
+    window.removeEventListener('resize', this.onResize);
+    this.inputManager?.dispose();
+    this.engine.dispose();
+    if (this.stage.controls) this.stage.controls.dispose();
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "Autonomous Agents Lab",
+  "description": "A high-performance 3D corporate simulation featuring autonomous agents powered by Gemini AI and WebGPU compute shaders.",
+  "requestFramePermissions": []
+}
