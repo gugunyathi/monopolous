@@ -85,8 +85,14 @@ const SocialPost: React.FC<{ post: any }> = ({ post }) => {
         className="relative z-10 flex flex-col items-center pointer-events-none"
       >
         {post.isLive && (
-          <div className="mt-4 bg-red-600 px-3 py-1 rounded-md text-[10px] font-black text-white uppercase tracking-widest animate-pulse shadow-lg shadow-red-600/50">
-            LIVE
+          <div className="mt-4 flex items-center gap-2">
+            <div className="relative">
+              <div className="absolute inset-0 rounded-md bg-red-600 animate-ping opacity-75" />
+              <div className="relative bg-red-600 px-3 py-1 rounded-md text-[10px] font-black text-white uppercase tracking-widest shadow-lg shadow-red-600/50 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-[blink_0.8s_step-start_infinite]" />
+                LIVE
+              </div>
+            </div>
           </div>
         )}
       </motion.div>

@@ -29,6 +29,11 @@ export class SceneManager {
   private manualCamera = false;
   private manualCameraTimer = 0;
 
+  // Live agent pulsing ring marker
+  private liveRingOuter: THREE.Mesh | null = null;
+  private liveRingInner: THREE.Mesh | null = null;
+  private liveDot: THREE.Mesh | null = null;
+
   constructor(container: HTMLElement) {
     this.engine = new Engine(container);
     this.stage = new Stage(this.engine.renderer.domElement);
@@ -56,6 +61,7 @@ export class SceneManager {
     this.engine.renderer.setAnimationLoop(this.animate.bind(this));
     window.addEventListener('resize', this.onResize.bind(this));
     this.setupCameraEvents();
+    this.createLiveMarker();
 
     const stateBuffer = this.characters.getAgentStateBuffer();
     if (stateBuffer) {
@@ -303,6 +309,56 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
     this.stage.onResize(w, h);
   }
 
+  private createLiveMarker() {
+    // Outer pulsing ring
+    const outerGeo = new THREE.RingGeometry(0.8, 1.05, 32);
+    const outerMat = new THREE.MeshStandardMaterial({
+      color: 0xff2222,
+      emissive: 0xff0000,
+      emissiveIntensity: 2.0,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.9,
+    });
+    this.liveRingOuter = new THREE.Mesh(outerGeo, outerMat);
+    this.liveRingOuter.rotation.x = -Math.PI / 2;
+    this.liveRingOuter.visible = false;
+    this.liveRingOuter.renderOrder = 1;
+    this.stage.scene.add(this.liveRingOuter);
+
+    // Inner pulsing ring (offset phase)
+    const innerGeo = new THREE.RingGeometry(0.4, 0.6, 32);
+    const innerMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: 0xffffff,
+      emissiveIntensity: 2.5,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.85,
+    });
+    this.liveRingInner = new THREE.Mesh(innerGeo, innerMat);
+    this.liveRingInner.rotation.x = -Math.PI / 2;
+    this.liveRingInner.visible = false;
+    this.liveRingInner.renderOrder = 1;
+    this.stage.scene.add(this.liveRingInner);
+
+    // Red dot at center
+    const dotGeo = new THREE.CircleGeometry(0.25, 16);
+    const dotMat = new THREE.MeshStandardMaterial({
+      color: 0xff0000,
+      emissive: 0xff0000,
+      emissiveIntensity: 3.0,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 1.0,
+    });
+    this.liveDot = new THREE.Mesh(dotGeo, dotMat);
+    this.liveDot.rotation.x = -Math.PI / 2;
+    this.liveDot.visible = false;
+    this.liveDot.renderOrder = 2;
+    this.stage.scene.add(this.liveDot);
+  }
+
   private animate() {
     this.engine.timer.update();
     const delta = this.engine.timer.getDelta();
@@ -406,6 +462,39 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
     }
 
     this.engine.render(this.stage.scene, this.stage.camera);
+
+    // Live agent pulsing ring marker
+    if (this.liveRingOuter && this.liveRingInner && this.liveDot) {
+      const { viewMode, activeSocialAgentIndex } = useStore.getState();
+      const showMarker = activeSocialAgentIndex !== null;
+      this.liveRingOuter.visible = showMarker;
+      this.liveRingInner.visible = showMarker;
+      this.liveDot.visible = showMarker;
+
+      if (showMarker && activeSocialAgentIndex !== null) {
+        const agentPos = this.characters.getCPUPosition(activeSocialAgentIndex);
+        if (agentPos) {
+          const y = 0.08;
+          // Outer ring: pulse scale 1.0 → 1.8 with a sine wave
+          const outerScale = 1.0 + 0.8 * ((Math.sin(time * 4.0) + 1) / 2);
+          // Inner ring: opposite phase, 1.8 → 1.0
+          const innerScale = 1.0 + 0.8 * ((Math.sin(time * 4.0 + Math.PI) + 1) / 2);
+          // Dot: flashes on/off at 2Hz
+          const dotVisible = Math.sin(time * 6.28 * 2) > 0;
+
+          this.liveRingOuter.position.set(agentPos.x, y, agentPos.z);
+          this.liveRingOuter.scale.setScalar(outerScale);
+          (this.liveRingOuter.material as THREE.MeshStandardMaterial).opacity =
+            viewMode === 'social' ? 0.55 : 0.75;
+
+          this.liveRingInner.position.set(agentPos.x, y + 0.01, agentPos.z);
+          this.liveRingInner.scale.setScalar(innerScale);
+
+          this.liveDot.position.set(agentPos.x, y + 0.02, agentPos.z);
+          this.liveDot.visible = dotVisible;
+        }
+      }
+    }
 
     this.updateStats(time);
     this.updateSocialSimulation(delta);
@@ -536,6 +625,14 @@ Include 2-3 relevant emojis. Be professional but "social media" savvy.`;
     this.unsubs.forEach(unsub => unsub());
     window.removeEventListener('resize', this.onResize);
     this.inputManager?.dispose();
+    // Clean up live marker meshes
+    [this.liveRingOuter, this.liveRingInner, this.liveDot].forEach(m => {
+      if (m) {
+        this.stage.scene.remove(m);
+        m.geometry.dispose();
+        (m.material as THREE.Material).dispose();
+      }
+    });
     this.engine.dispose();
     if (this.stage.controls) this.stage.controls.dispose();
   }
