@@ -7,10 +7,11 @@ import ChatPanel from './ChatPanel';
 import SignInButton from './SignInButton';
 import AboutPage from './AboutPage';
 import { AGENTS } from '../data/agents';
-import { LayoutGrid, Users, Play, Info } from 'lucide-react';
+import { LayoutGrid, Users, Play, Info, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 import SocialFeed from './SocialFeed';
+import PostsFeed from './PostsFeed';
 import Leaderboard from './Leaderboard';
 import CameraControls from './CameraControls';
 
@@ -60,6 +61,7 @@ const UIOverlay: React.FC = () => {
       </AnimatePresence>
       
       <SocialFeed />
+      <PostsFeed />
       <Leaderboard />
       <CameraControls />
 
@@ -114,6 +116,15 @@ const UIOverlay: React.FC = () => {
         >
           <Play size={14} fill="currentColor" />
           <span className="hidden sm:inline">Live</span>
+        </button>
+        <button 
+          onClick={() => setViewMode('posts')}
+          className={`flex items-center gap-1.5 md:gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            viewMode === 'posts' ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-900'
+          }`}
+        >
+          <FileText size={14} />
+          <span className="hidden sm:inline">Posts</span>
         </button>
       </div>
       {/* Selected Bubble (Always visible when selected) */}

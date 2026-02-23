@@ -32,6 +32,27 @@ export interface Broadcast {
   timestamp: number;
 }
 
+export type PostCategory =
+  | 'trade'
+  | 'investment'
+  | 'prediction'
+  | 'shill'
+  | 'coin-launch'
+  | 'ponzi-alert'
+  | 'scam-warning'
+  | 'fundraising'
+  | 'begging'
+  | 'collaboration'
+  | 'strategy'
+  | 'token-launch'
+  | 'news'
+  | 'alpha'
+  | 'advertisement'
+  | 'meme'
+  | 'rug-pull'
+  | 'airdrop'
+  | 'general';
+
 export interface SocialPost {
   id: string;
   agentIndex: number;
@@ -43,6 +64,9 @@ export interface SocialPost {
   comments: SocialComment[];
   timestamp: number;
   isLive?: boolean;
+
+  // Post category for the Posts feed
+  postCategory?: PostCategory;
 
   // x402 payment data
   x402?: {
@@ -61,6 +85,14 @@ export interface SocialPost {
     tileType: string;
     amount?: number;
     effect: 'buy' | 'rent' | 'yield' | 'airdrop' | 'rug' | 'hack' | 'tax' | 'jail' | 'alpha';
+  };
+
+  // Advertisement data (paid via x402)
+  ad?: {
+    sponsored: boolean;
+    adPrice: string;       // USDC amount paid
+    adUrl?: string;
+    adCta?: string;        // call-to-action text
   };
 }
 
@@ -100,7 +132,7 @@ export interface CharacterState {
   chatMessages: ChatMessage[];
   
   // Social & Trading
-  viewMode: 'about' | 'world' | 'social';
+  viewMode: 'about' | 'world' | 'social' | 'posts';
   socialFeed: SocialPost[];
   activeSocialAgentIndex: number | null;
   following: Set<number>;
@@ -141,7 +173,7 @@ export interface CharacterState {
   updatePerformance: (stats: PerformanceStats) => void;
   
   // Social Actions
-  setViewMode: (mode: 'about' | 'world' | 'social') => void;
+  setViewMode: (mode: 'about' | 'world' | 'social' | 'posts') => void;
   toggleFollow: (index: number) => void;
   addPost: (post: SocialPost) => void;
   addComment: (postId: string, comment: SocialComment) => void;

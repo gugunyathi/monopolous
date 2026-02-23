@@ -9,6 +9,7 @@ import { sdk } from '@farcaster/miniapp-sdk';
 import { SceneManager } from './three/SceneManager';
 import UIOverlay from './components/UIOverlay';
 import { startBroadcastScheduler, stopBroadcastScheduler } from './services/broadcastService';
+import { startPostScheduler, stopPostScheduler } from './services/postGeneratorService';
 
 const App: React.FC = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -23,6 +24,7 @@ const App: React.FC = () => {
       managerRef.current = new SceneManager(canvasRef.current);
     }
     startBroadcastScheduler();
+    startPostScheduler();
 
     return () => {
       if (managerRef.current) {
@@ -30,6 +32,7 @@ const App: React.FC = () => {
         managerRef.current = null;
       }
       stopBroadcastScheduler();
+      stopPostScheduler();
     };
   }, []);
 
