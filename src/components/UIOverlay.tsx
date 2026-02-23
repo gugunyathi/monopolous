@@ -5,8 +5,9 @@ import DebugPanel from './DebugPanel';
 import HelpModal from './HelpModal';
 import ChatPanel from './ChatPanel';
 import SignInButton from './SignInButton';
+import AboutPage from './AboutPage';
 import { AGENTS } from '../data/agents';
-import { LayoutGrid, Users, Play } from 'lucide-react';
+import { LayoutGrid, Users, Play, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 import SocialFeed from './SocialFeed';
@@ -51,6 +52,9 @@ const UIOverlay: React.FC = () => {
         <SignInButton />
       </div>
 
+      {/* About Landing Page */}
+      <AboutPage />
+
       <AnimatePresence>
         <ChatPanel />
       </AnimatePresence>
@@ -84,6 +88,15 @@ const UIOverlay: React.FC = () => {
 
       {/* View Mode Toggle */}
       <div className="fixed bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 flex bg-white/80 backdrop-blur-xl p-1.5 rounded-2xl border border-black/5 shadow-2xl pointer-events-auto z-[110]">
+        <button 
+          onClick={() => setViewMode('about')}
+          className={`flex items-center gap-1.5 md:gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            viewMode === 'about' ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-900'
+          }`}
+        >
+          <Info size={14} />
+          <span className="hidden sm:inline">About</span>
+        </button>
         <button 
           onClick={() => setViewMode('world')}
           className={`flex items-center gap-1.5 md:gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${

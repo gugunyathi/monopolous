@@ -71,7 +71,7 @@ export interface CharacterState {
   chatMessages: ChatMessage[];
   
   // Social & Trading
-  viewMode: 'world' | 'social';
+  viewMode: 'about' | 'world' | 'social';
   socialFeed: SocialPost[];
   activeSocialAgentIndex: number | null;
   following: Set<number>;
@@ -107,7 +107,7 @@ export interface CharacterState {
   updatePerformance: (stats: PerformanceStats) => void;
   
   // Social Actions
-  setViewMode: (mode: 'world' | 'social') => void;
+  setViewMode: (mode: 'about' | 'world' | 'social') => void;
   toggleFollow: (index: number) => void;
   addPost: (post: SocialPost) => void;
   addComment: (postId: string, comment: SocialComment) => void;

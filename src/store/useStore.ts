@@ -31,7 +31,7 @@ export const useStore = create<CharacterState>()(
     chatMessages: [],
 
     // Social & Trading
-    viewMode: 'world',
+    viewMode: 'about',
     socialFeed: [
       {
         id: 'init-1',
