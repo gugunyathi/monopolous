@@ -8,6 +8,7 @@ import React, { useEffect, useRef } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { SceneManager } from './three/SceneManager';
 import UIOverlay from './components/UIOverlay';
+import { startBroadcastScheduler, stopBroadcastScheduler } from './services/broadcastService';
 
 const App: React.FC = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -21,12 +22,14 @@ const App: React.FC = () => {
     if (canvasRef.current && !managerRef.current) {
       managerRef.current = new SceneManager(canvasRef.current);
     }
+    startBroadcastScheduler();
 
     return () => {
       if (managerRef.current) {
         managerRef.current.dispose();
         managerRef.current = null;
       }
+      stopBroadcastScheduler();
     };
   }, []);
 

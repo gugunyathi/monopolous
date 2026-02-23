@@ -22,10 +22,20 @@ export interface ChatMessage {
   timestamp: string;
 }
 
+export interface Broadcast {
+  id: string;
+  headline: string;
+  detail: string;
+  sentiment: -1 | 0 | 1;  // -1 bear, 0 neutral, +1 bull
+  tokens: string[];         // tokens most affected
+  category: 'bull' | 'bear' | 'fud' | 'hopium' | 'airdrop' | 'regulation' | 'tech' | 'macro';
+  timestamp: number;
+}
+
 export interface SocialPost {
   id: string;
   agentIndex: number;
-  type: 'post' | 'live' | 'x402';
+  type: 'post' | 'live' | 'x402' | 'broadcast' | 'tile';
   content: string;
   token?: string;
   action?: 'buy' | 'sell' | 'pay' | 'search' | 'monetize';
@@ -40,6 +50,17 @@ export interface SocialPost {
     price?: string;
     category?: string;
     command?: string;
+  };
+
+  // CEO broadcast data
+  broadcast?: Broadcast;
+
+  // Tile landing event
+  tileEvent?: {
+    tileName: string;
+    tileType: string;
+    amount?: number;
+    effect: 'buy' | 'rent' | 'yield' | 'airdrop' | 'rug' | 'hack' | 'tax' | 'jail' | 'alpha';
   };
 }
 
@@ -88,6 +109,11 @@ export interface CharacterState {
   // Auth
   userAddress: string | null;
   setUserAddress: (address: string | null) => void;
+
+  // CEO Broadcast
+  activeBroadcast: Broadcast | null;
+  broadcastHistory: Broadcast[];
+  addBroadcast: (b: Broadcast) => void;
 
   // Monopoly Game State
   boardTiles: BoardTile[];

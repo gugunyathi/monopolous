@@ -1,6 +1,6 @@
 
 import { create } from 'zustand';
-import { CharacterState, AnimationName, PerformanceStats, BoidsParams, ActiveEncounter } from '../types';
+import { CharacterState, AnimationName, PerformanceStats, BoidsParams, ActiveEncounter, Broadcast, SocialPost } from '../types';
 
 export const useStore = create<CharacterState>()(
   (set) => ({
@@ -89,6 +89,27 @@ export const useStore = create<CharacterState>()(
 
     // Auth
     userAddress: null,
+
+    // CEO Broadcast
+    activeBroadcast: null,
+    broadcastHistory: [],
+    addBroadcast: (b: Broadcast) => set((state) => ({
+      activeBroadcast: b,
+      broadcastHistory: [b, ...state.broadcastHistory].slice(0, 20),
+      // CEO broadcasts also post to social feed automatically
+      socialFeed: [{
+        id: b.id,
+        agentIndex: 0,
+        type: 'broadcast' as SocialPost['type'],
+        content: b.headline,
+        token: b.tokens[0] ?? '',
+        action: (b.sentiment === 1 ? 'buy' : 'sell') as SocialPost['action'],
+        likes: 0,
+        comments: [],
+        timestamp: b.timestamp,
+        broadcast: b,
+      } as SocialPost, ...state.socialFeed].slice(0, 50),
+    })),
 
     // Monopoly Game State
     boardTiles: [

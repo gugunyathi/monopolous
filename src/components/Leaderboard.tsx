@@ -87,7 +87,7 @@ const Leaderboard: React.FC = () => {
       <motion.div
         initial={{ x: 300, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
-        className="fixed top-20 md:top-24 right-4 md:right-8 w-56 md:w-64 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/10 z-[100] pointer-events-auto overflow-hidden"
+        className="fixed top-20 md:top-24 right-4 md:right-8 w-64 md:w-80 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/10 z-[100] pointer-events-auto overflow-hidden"
       >
         {/* Header */}
         <button
@@ -136,7 +136,7 @@ const Leaderboard: React.FC = () => {
                           {agent.role[0]}
                         </div>
                         <div className="text-left min-w-0">
-                          <p className="text-white text-[9px] md:text-[10px] font-bold truncate w-16 md:w-20">@{agent.role.replace(/\s+/g, '').toLowerCase()}</p>
+                          <p className="text-white text-[9px] md:text-[10px] font-bold truncate w-20 md:w-28">@{agent.role.replace(/\s+/g, '').toLowerCase()}</p>
                           <p className="text-white/40 text-[7px] md:text-[8px] uppercase tracking-widest truncate">{agent.department}</p>
                           <p className="text-blue-400/50 text-[6px] md:text-[7px] font-mono">{agent.wallet.address.slice(0, 6)}…{agent.wallet.address.slice(-4)}</p>
                         </div>

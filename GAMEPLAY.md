@@ -7,12 +7,15 @@
 
 ## 🎯 Core Concept
 
-**Monopolous** is not just a game — it's a **living, breathing crypto trading universe** where 100 AI-powered agents autonomously walk around a Monopoly-style board, buy DeFi properties, trade meme coins, go live on social feeds, and compete for dominance.
+**Monopolous** is not just a game — it's a **living, breathing crypto trading universe** where **2,000 AI-powered agents** autonomously walk around a Monopoly-style board, buy DeFi properties, trade meme coins, react to CEO market broadcasts, make x402 micro-payments, and compete for dominance in real-time.
 
-You are **Agent #0**, the observer and influencer. NPCs (Agents #1-99) operate independently, powered by:
+You are **Agent #0**, the observer and CEO. NPCs (Agents #1-1999) operate independently, powered by:
 - **GPU compute shaders** for physics and movement
 - **Google Gemini AI** for personality-driven conversations and social posts
-- **Autonomous behavior logic** for board navigation, trading decisions, and social interactions
+- **Autonomous tile resolution** for board economics (buy, rent, yield, events, taxes)
+- **CEO Broadcast System** — market announcements that shift agent behavior, dice rolls, and balances
+- **x402 micro-payment protocol** — agents pay for on-chain data and services via Base wallets
+- **Agentic wallets** — every agent has a live Base (Ethereum L2) wallet address
 
 ---
 
@@ -65,15 +68,15 @@ Color-coded property sets create monopolies when an agent owns all tiles in a ca
   - Walk around the board using click-to-move
   - Observe NPC trading behaviors, balances, and leaderboard
 
-#### **NPCs (Agents #1-99) — The Workforce**
+#### **NPCs (Agents #1-1999) — The Workforce**
 Divided into **4 departments** with distinct traits:
 
 | Department | Color | Count | Roles | Example |
-|------------|-------|-------|-------|---------|
-| **Production** | 🟢 Green | ~25 | Software Engineers, DevOps, QA, Designers | "Senior Software Engineer optimizing the mobile app" |
-| **Sales** | 🔴 Red | ~25 | Account Execs, Customer Success, Partnership Managers | "Enterprise Sales Director closing $5M deals" |
-| **Marketing** | 🔵 Blue | ~25 | Content Strategists, Social Media Leads, Brand Designers | "SEO Specialist driving organic growth" |
-| **Finance** | 🟡 Yellow | ~25 | Financial Analysts, Accountants, Procurement Officers | "Procurement Officer optimizing vendor contracts" |
+|------------|-------|-------|-------|----------|
+| **Production** | 🟢 Green | ~500 | Software Engineers, DevOps, QA, Designers | "Senior Software Engineer optimizing the mobile app" |
+| **Sales** | 🔴 Red | ~500 | Account Execs, Customer Success, Partnership Managers | "Enterprise Sales Director closing $5M deals" |
+| **Marketing** | 🔵 Blue | ~500 | Content Strategists, Social Media Leads, Brand Designers | "SEO Specialist driving organic growth" |
+| **Finance** | 🟡 Yellow | ~500 | Financial Analysts, Accountants, Procurement Officers | "Procurement Officer optimizing vendor contracts" |
 
 ### Agent Personalities
 
@@ -103,17 +106,17 @@ Each agent has a **unique trading personality**:
 
 **How NPCs Move:**
 1. **Spawn** at a random tile on the board perimeter (distributed evenly, tiles 0-31)
-2. **Immediate dice roll** (1-6) determines destination tile
+2. **Immediate dice roll** (1-6 base, may be modified by CEO broadcasts, see below) determines destination tile
 3. **Walk one tile at a time** clockwise around the board (no diagonal shortcuts)
-4. **Arrive at waypoint** → **Pause** (400-1800ms) → **Roll dice again** → **Repeat**
+4. **Arrive at waypoint** → **Pause** (800-2400ms) → **Tile resolution fires** → **Roll dice again** → **Repeat**
 
 **State Machine (GPU Compute Shader):**
 ```
 GOTO (state 2)  →  Walk toward current waypoint tile
-  ↓ (on arrival)
-FROZEN (state 1) →  Idle animation, pausing on tile
-  ↓ (after pause duration)
-Roll dice  →  Set destination tile  →  Walk to next tile (GOTO)
+  ↓ (on arrival, 150-400ms delay)
+FROZEN (state 1) →  Idle animation + resolve tile landing (buy/rent/event/tax)
+  ↓ (after 800-2400ms pause)
+Roll dice  →  Apply broadcast impact  →  Set destination  →  Walk (GOTO)
 ```
 
 **Visual Behavior:**
@@ -121,23 +124,110 @@ Roll dice  →  Set destination tile  →  Walk to next tile (GOTO)
 - **Paused/Frozen**: Play "Idle" animation, face other agents on the same tile (social chat)
 - **Waving**: Play "Wave" animation when going live or chatting with player
 
-### 2. Property System (Simulated Trading)
+### 2. Tile Resolution — Autonomous Economics
 
-Every 60 frames (~1 second):
-- **Random profit events**: 5% chance an agent gains $0-$50 in trading profits
-- **Property purchases**: 1% chance an agent buys a property they land on (if unowned)
-- **Balance tracking**: All agents start at $1,500 (Monopoly default)
-- **Leaderboard updates**: Top 10 agents by balance displayed in real-time
+When an NPC arrives at a tile, the game fires **tile resolution** ~150-400ms after landing. Each landing triggers one of the following outcomes:
 
-**Property Ownership:**
-```typescript
-agentBalances: Map<agentIndex, balance>
-// Example: agentBalances[42] = $2,340 → Agent #42 has $2,340
-```
+#### 🏗️ Property Tiles (unowned)
+Agents autonomously decide whether to purchase based on **risk appetite**:
 
-Properties are stored per agent in the `buyProperty()` action but not yet enforcing rent mechanics (expandable in future versions).
+| Risk Level | Buy Probability |
+|------------|----------------|
+| Degen | 80% chance |
+| High | 60% chance |
+| Medium | 38% chance |
+| Low | 18% chance |
 
-### 3. Social Feed — TikTok-Style Live Streams
+On purchase: balance decreases by tile price, tile ownership is recorded, social post generated.
+
+#### 🏠 Property Tiles (owned by self)
+Agent collects a **6% yield** on the tile price. A social post is generated 30% of the time.
+
+#### 💸 Property Tiles (owned by another agent)
+Agent pays **10% of the tile price** as rent. The owner's balance is credited. A social post is generated 40% of the time.
+
+#### ⚡ Event Tiles
+
+| Tile | Effect | Amount |
+|------|--------|--------|
+| AIRDROP | Balance +$200 | Always posts |
+| RUG PULL | Balance -$300 | Always posts |
+| HACKED | Balance -$500 | Always posts |
+| FREE ALPHA | Balance +$150 | Always posts |
+| GO TO REKT | Balance -$100 | Always posts |
+
+#### 💰 Tax/Fine Tiles
+- **GAS TAX** / **SEC FINE** — Agent pays the tile's face value price. Always generates a social post.
+
+#### 🌱 GENESIS (Start Tile)
+- Agent collects **$200 salary** every time they pass or land on GENESIS. Posts 20% of the time.
+
+---
+
+### 3. CEO Broadcast System
+
+Every **45–90 seconds** (first broadcast after 20–30s warmup), the CEO (Agent #0) fires a **market broadcast** that ripples across all 2,000 agents.
+
+#### Broadcast Categories
+
+| Category | Sentiment | Examples |
+|----------|-----------|----------|
+| **bull** | Bullish (+1) | "BTC ETF inflows hit $2.4B — institutional wave incoming" |
+| **bear** | Bearish (-1) | "Crypto winter deepens — BTC dominance over 60%" |
+| **fud** | Neutral (0) | "SEC targets top DeFi protocols in sweeping enforcement" |
+| **hopium** | Bullish (+1) | "Layer 2 TVL surpasses Ethereum mainnet for first time" |
+| **airdrop** | Bullish (+1) | "Airdrop season: 3 major protocols confirm token launches" |
+| **regulation** | Bearish (-1) | "G20 pushes for global crypto transaction reporting" |
+| **tech** | Bullish (+1) | "ZK-proof breakthrough slashes verification costs by 99%" |
+| **macro** | Bearish (-1) | "Federal Reserve signals extended high-rate environment" |
+
+#### Broadcast Impact on Agent Behavior
+
+When agents roll their dice **after** a new broadcast, the broadcast's sentiment modifies the roll:
+
+| Agent Risk | Bullish Broadcast | Bearish Broadcast |
+|------------|-------------------|-------------------|
+| Degen | +2 steps, +$330 avg balance | -1 step, +$200 (buys the dip) |
+| High | +2 steps, +$250 avg | -1 step, -$150 |
+| Medium | +1 step, +$150 avg | -1 step, -$80 |
+| Low | 0 steps, +$50 avg | -1 step, -$72 |
+
+Dice rolls are clamped to **1–12** after broadcast modification.
+
+#### Broadcast Reactions (Social Feed)
+After a broadcast, **3–6 random agents** post reactions to their social feed with a 1.2–3.2s stagger:
+- Degens react enthusiastically to bull signals ("LFG 🚀🚀! $ETH moon mission confirmed")
+- Low-risk agents react cautiously to bear signals ("Repositioning to USDC 50% allocation")
+- Broadcast post appears in Social Feed with **CEO Broadcast** card style, sentiment badge, and token pills
+
+---
+
+### 4. x402 Micro-Payments
+
+Agents autonomously pay for on-chain data and services via the **x402 payment protocol** on Base (Ethereum L2).
+
+**How it works:**
+1. Agent needs external data (price feeds, portfolio analytics, alpha calls)
+2. Agent's agentic wallet sends USDC payment (typically $0.001–$5.00) to the service endpoint
+3. Service returns data; agent uses it in their next trade decision or social post
+4. Payment appears in Social Feed with **x402 Payment** card style
+
+**Agentic Wallets:**
+Every agent (including the player) has a live **Base wallet address** shown in their social feed profile. Balances are tracked in real-time and reflected in the Leaderboard.
+
+---
+
+### 5. Property System (Full Economics)
+
+- **All agents start with $1,500** (Monopoly default)
+- **Balance tracking**: Updated in real-time via Zustand store
+- **Leaderboard**: Top 10 agents by balance, updated every frame
+
+**Property purchase / rent / yield logic fires on tile arrival** (see §2 Tile Resolution above for full probabilities and amounts).\
+
+**Persistence:** Tile ownership is stored in the `propertyOwners` map in Zustand: `propertyOwners[tileId] = agentIndex`. Rent and yield continue as long as ownership persists.\
+
+### 6. Social Feed — TikTok-Style Live Streams
 
 **Agent Live Streaming:**
 - Every **~8 seconds**, a random NPC goes **LIVE**
@@ -169,7 +259,7 @@ Properties are stored per agent in the `buyProperty()` action but not yet enforc
 - Agent performs **Wave animation** when streaming
 - Auto-comments from other agents appear after 3 seconds
 
-### 4. Camera Modes
+### 7. Camera Modes
 
 | Mode | Description | Controls |
 |------|-------------|----------|
@@ -184,7 +274,7 @@ Properties are stored per agent in the `buyProperty()` action but not yet enforc
 - **Top Down** — maxDistance 40, position (0, 40, 0.1)
 - **Reset** — default position (0, 55, 38)
 
-### 5. Chat System (Player ↔ NPC)
+### 8. Chat System (Player ↔ NPC)
 
 **How to Chat:**
 1. Click on any NPC in the 3D world
@@ -209,7 +299,7 @@ Properties are stored per agent in the `buyProperty()` action but not yet enforc
 - NPC resumes walking around the board
 - Player returns to FROZEN state
 
-### 6. Following & Engagement
+### 9. Following & Engagement
 
 **Following Agents:**
 - Click **Follow** on any agent's social post
@@ -315,9 +405,12 @@ Properties are stored per agent in the `buyProperty()` action but not yet enforc
   - Likes, comments, follow button
 
 #### Right Panel — Leaderboard (World View)
-- **Top 10 agents by balance**
+- **Top 10 agents by balance** (out of 2,000)
 - Color-coded by department
-- Real-time updates every 60 frames
+- Real-time balance updates every frame
+- **PnL % column** — shows gain/loss vs. starting balance ($1,500)
+- **Fund button** — opens modal to top up player wallet via `BasePayButton` (USDC on Base)
+- Leaderboard panel width: `w-64 md:w-80` for comfortable reading
 
 #### Bottom-Center — View Mode Toggle
 - **World View** (grid icon) — Default 3D exploration
