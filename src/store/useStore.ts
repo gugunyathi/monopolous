@@ -177,6 +177,10 @@ export const useStore = create<CharacterState>()(
     })),
     setActiveSocialAgentIndex: (index) => set({ activeSocialAgentIndex: index }),
 
+    // Fund Modal
+    fundingAgentIndex: null,
+    setFundingAgentIndex: (index) => set({ fundingAgentIndex: index }),
+
     // Game Actions
     buyProperty: (agentIndex, tileId) => set((state) => {
       const tile = state.boardTiles.find(t => t.id === tileId);

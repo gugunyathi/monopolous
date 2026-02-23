@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import DebugPanel from './DebugPanel';
 import HelpModal from './HelpModal';
@@ -7,12 +7,15 @@ import ChatPanel from './ChatPanel';
 import SignInButton from './SignInButton';
 import AboutPage from './AboutPage';
 import { AGENTS } from '../data/agents';
-import { LayoutGrid, Users, Play, Info } from 'lucide-react';
+import { LayoutGrid, Users, Play, Info, TrendingUp, TrendingDown, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 import SocialFeed from './SocialFeed';
 import Leaderboard from './Leaderboard';
 import CameraControls from './CameraControls';
+
+// earnings rate (USDC / second) per risk level
+const EARN_RATE: Record<string, number> = { Low: 0.04, Medium: 0.12, High: 0.28, Degen: 0.55 };
 
 const UIOverlay: React.FC = () => {
   const { 
@@ -28,9 +31,36 @@ const UIOverlay: React.FC = () => {
     isChatting,
     viewMode,
     setViewMode,
-    socialFeed
+    socialFeed,
+    agentBalances,
+    leaderboard,
+    setFundingAgentIndex,
   } = useStore();
   const [isHelpOpen, setHelpOpen] = useState(false);
+
+  // Live money ticker — accumulates cosmetic earnings while agent is selected
+  const [ticker, setTicker] = useState(0);
+  const tickerRef = useRef(0);
+  const prevSelectedRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (selectedNpcIndex === null) { setTicker(0); tickerRef.current = 0; return; }
+    // reset ticker when agent changes
+    if (prevSelectedRef.current !== selectedNpcIndex) {
+      setTicker(0); tickerRef.current = 0;
+      prevSelectedRef.current = selectedNpcIndex;
+    }
+    const agent = AGENTS[selectedNpcIndex];
+    if (!agent) return;
+    const rate = EARN_RATE[agent.riskLevel] ?? 0.1;
+    const id = setInterval(() => {
+      // add a jittered fraction each tick (200 ms)
+      const delta = (rate / 5) * (0.6 + Math.random() * 0.8);
+      tickerRef.current += delta;
+      setTicker(t => t + delta);
+    }, 200);
+    return () => clearInterval(id);
+  }, [selectedNpcIndex]);
 
   const selectedAgent = selectedNpcIndex != null ? AGENTS[selectedNpcIndex] ?? null : null;
   const hoveredAgent = hoveredNpcIndex != null ? AGENTS[hoveredNpcIndex] ?? null : null;
@@ -208,69 +238,118 @@ const UIOverlay: React.FC = () => {
 
       {/* NPC Info Panel — shown when an NPC is selected */}
       {selectedAgent && (
-        <div className="absolute bottom-20 md:bottom-8 left-4 md:left-8 w-[calc(100%-2rem)] md:w-72 bg-white/85 backdrop-blur-2xl rounded-2xl border border-black/5 shadow-2xl p-4 md:p-5 pointer-events-auto animate-in fade-in slide-in-from-left-4 duration-300 z-30 overflow-hidden max-h-[50vh] md:max-h-none overflow-y-auto">
+        <div className="absolute bottom-20 md:bottom-8 left-4 md:left-8 w-[calc(100%-2rem)] md:w-72 bg-white/85 backdrop-blur-2xl rounded-2xl border border-black/5 shadow-2xl pointer-events-auto animate-in fade-in slide-in-from-left-4 duration-300 z-30 overflow-hidden max-h-[70vh] md:max-h-none overflow-y-auto">
           {/* Color accent bar */}
-          <div 
-            className="absolute top-0 left-0 w-full h-1" 
-            style={{ backgroundColor: selectedAgent.color }}
-          />
-          <div className="flex items-start justify-between mb-3">
+          <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: selectedAgent.color }} />
+
+          {/* Header row: name + Fund button */}
+          <div className="flex items-start justify-between p-4 md:p-5 pb-3">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-0.5">
-                {selectedAgent.department}
-              </p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-0.5">{selectedAgent.department}</p>
               <h2 className="text-xl font-black text-zinc-900 leading-tight">{selectedAgent.role}</h2>
             </div>
+            {!selectedAgent.isPlayer && (
+              <button
+                onClick={() => setFundingAgentIndex(selectedNpcIndex!)}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-blue-500 text-white text-[9px] font-black uppercase tracking-widest hover:bg-blue-400 active:scale-95 transition-all shadow-md shadow-blue-500/30 shrink-0 mt-1"
+              >
+                <Zap size={10} /> Fund
+              </button>
+            )}
           </div>
 
+          {/* Live balance + PnL */}
+          {!selectedAgent.isPlayer && (() => {
+            const startBal = selectedAgent.wallet.balance;
+            const storedBal = agentBalances[selectedAgent.index] ?? startBal;
+            const lbEntry = leaderboard.find(e => e.agentIndex === selectedAgent.index);
+            const netWorth = lbEntry ? lbEntry.netWorth : storedBal;
+            const displayBal = storedBal + ticker;
+            const pnl = netWorth - startBal;
+            const pnlPct = ((pnl / startBal) * 100).toFixed(1);
+            const isProfit = pnl >= 0;
+            const rate = EARN_RATE[selectedAgent.riskLevel] ?? 0.1;
+            return (
+              <div className="mx-4 md:mx-5 mb-3 rounded-xl border border-black/5 overflow-hidden">
+                {/* Total balance counter */}
+                <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-900">
+                  <div>
+                    <p className="text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-0.5">Balance</p>
+                    <p className="text-lg font-black text-white tabular-nums">
+                      ${displayBal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-0.5">Earning</p>
+                    <p className="text-emerald-400 text-sm font-black">+${rate.toFixed(2)}/s</p>
+                  </div>
+                </div>
+                {/* PnL row */}
+                <div className={`flex items-center justify-between px-3 py-2 ${isProfit ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                  <div className="flex items-center gap-1.5">
+                    {isProfit
+                      ? <TrendingUp size={12} className="text-emerald-500" />
+                      : <TrendingDown size={12} className="text-red-500" />}
+                    <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">PnL</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-black ${isProfit ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {isProfit ? '+' : ''}${pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                      isProfit ? 'bg-emerald-500/15 text-emerald-600' : 'bg-red-500/15 text-red-600'
+                    }`}>
+                      {isProfit ? '+' : ''}{pnlPct}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Wallet Address */}
-          <div className="flex items-center gap-1.5 mb-2">
+          <div className="flex items-center gap-1.5 px-4 md:px-5 mb-2">
             <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Wallet</span>
             <code className="text-[9px] font-mono text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">
               {selectedAgent.wallet.address.slice(0, 6)}…{selectedAgent.wallet.address.slice(-4)}
             </code>
-            <span className="text-[9px] font-bold text-emerald-500">${selectedAgent.wallet.balance.toLocaleString()} USDC</span>
           </div>
 
           {/* Skills */}
-          <div className="flex flex-wrap gap-1 mb-2">
+          <div className="flex flex-wrap gap-1 px-4 md:px-5 mb-2">
             {selectedAgent.wallet.skills.map((skill) => (
-              <span key={skill} className="text-[8px] font-bold bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded-full">
-                {skill}
-              </span>
+              <span key={skill} className="text-[8px] font-bold bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded-full">{skill}</span>
             ))}
           </div>
 
-          <p className="text-xs text-zinc-600 leading-relaxed mb-3 italic">
-            "{selectedAgent.mission}"
-          </p>
+          <p className="text-xs text-zinc-600 leading-relaxed px-4 md:px-5 mb-3 italic">"{selectedAgent.mission}"</p>
 
-          <div className="flex flex-wrap gap-1 mb-3">
+          <div className="flex flex-wrap gap-1 px-4 md:px-5 mb-3">
             {selectedAgent.expertise.map((tag) => (
-              <span key={tag} className="text-[10px] font-bold bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full">
-                {tag}
-              </span>
+              <span key={tag} className="text-[10px] font-bold bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full">{tag}</span>
             ))}
           </div>
 
-          <p className="text-[11px] text-zinc-400 leading-snug mb-5">{selectedAgent.personality}</p>
+          <p className="text-[11px] text-zinc-400 leading-snug px-4 md:px-5 mb-4">{selectedAgent.personality}</p>
 
-          {isChatting ? (
-            <button
-              onClick={handleEndChat}
-              style={{ backgroundColor: selectedAgent.color }}
-              className="w-full py-3 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-90 active:scale-[0.98] transition-all shadow-lg pointer-events-auto"
-            >
-              End Chat
-            </button>
-          ) : (
-            <button
-              onClick={handleStartChat}
-              className="w-full py-3 bg-zinc-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black active:scale-[0.98] transition-all shadow-lg shadow-zinc-200 pointer-events-auto"
-            >
-              Start Chat
-            </button>
-          )}
+          <div className="px-4 md:px-5 pb-4 md:pb-5">
+            {isChatting ? (
+              <button
+                onClick={handleEndChat}
+                style={{ backgroundColor: selectedAgent.color }}
+                className="w-full py-3 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-90 active:scale-[0.98] transition-all shadow-lg pointer-events-auto"
+              >
+                End Chat
+              </button>
+            ) : (
+              <button
+                onClick={handleStartChat}
+                className="w-full py-3 bg-zinc-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black active:scale-[0.98] transition-all shadow-lg shadow-zinc-200 pointer-events-auto"
+              >
+                Start Chat
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
