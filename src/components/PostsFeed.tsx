@@ -156,14 +156,14 @@ const PostsFeed: React.FC = () => {
   if (viewMode !== 'posts') return null;
 
   return (
-    <div className="fixed inset-0 z-[100] pointer-events-auto">
+    <div className="fixed inset-0 z-[100] pointer-events-auto" style={{ height: '100dvh' }}>
       {/* Background overlay */}
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
 
       {/* Header */}
       <div className="relative z-10 flex flex-col">
         {/* Top bar */}
-        <div className="flex items-center justify-between px-4 md:px-6 pt-4 md:pt-6 pb-2">
+        <div className="flex items-center justify-between px-3 sm:px-4 md:px-6 pt-3 sm:pt-4 md:pt-6 pb-2">
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-white font-black text-lg md:text-xl tracking-tight">Posts</h1>
@@ -259,8 +259,8 @@ const PostsFeed: React.FC = () => {
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="relative z-10 overflow-y-auto px-4 md:px-6 pb-28"
-        style={{ height: 'calc(100vh - 120px)' }}
+        className="relative z-10 overflow-y-auto px-3 sm:px-4 md:px-6 pb-28 sm:pb-28"
+        style={{ height: 'calc(100dvh - 120px)' }}
       >
         {/* ─── Trending Section ─── */}
         <TrendingSection trending={trending} onFilterToken={(token) => setActiveFilter('all')} />
@@ -342,7 +342,7 @@ const TrendingSection: React.FC<{
             )}
 
             {/* Trending Agents & Categories row */}
-            <div className="grid grid-cols-2 gap-2 mb-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
               {/* Top Agents */}
               {trending.agents.length > 0 && (
                 <div className="bg-zinc-900/80 border border-white/5 rounded-xl p-3">
@@ -458,6 +458,9 @@ const PostCard: React.FC<{ post: SocialPostType }> = ({ post }) => {
                 </span>
                 {isCEO && (
                   <span className="text-[8px] font-black bg-sky-500/20 text-sky-400 px-1.5 py-0.5 rounded uppercase tracking-widest">CEO</span>
+                )}
+                {post.isADK && (
+                  <span className="text-[8px] font-black bg-violet-500/20 text-violet-400 px-1.5 py-0.5 rounded uppercase tracking-widest" title="Autonomous decision via Gemini">🧠 AI</span>
                 )}
                 <button
                   onClick={() => toggleFollow(post.agentIndex)}

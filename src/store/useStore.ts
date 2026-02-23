@@ -1,6 +1,17 @@
 
 import { create } from 'zustand';
 import { CharacterState, AnimationName, PerformanceStats, BoidsParams, ActiveEncounter, Broadcast, SocialPost } from '../types';
+import { AGENTS, CORE_AGENT_COUNT } from '../data/agents';
+
+// Initialize balances for all 100 core agents from their wallet data
+function buildInitialBalances(): Record<number, number> {
+  const balances: Record<number, number> = {};
+  for (let i = 0; i < CORE_AGENT_COUNT; i++) {
+    const agent = AGENTS[i];
+    if (agent) balances[i] = agent.wallet.balance;
+  }
+  return balances;
+}
 
 export const useStore = create<CharacterState>()(
   (set) => ({
@@ -87,6 +98,9 @@ export const useStore = create<CharacterState>()(
     following: new Set(),
     tradingLog: [],
 
+    // ADK agent tracking (agents currently controlled by autonomous orchestrator)
+    activeADKAgents: new Set<number>(),
+
     // Auth
     userAddress: null,
 
@@ -147,7 +161,7 @@ export const useStore = create<CharacterState>()(
       { id: '31', name: 'Coinbase', type: 'property', price: 350, color: '#0052ff', category: 'CEX' },
       { id: '32', name: 'Binance', type: 'property', price: 400, color: '#0052ff', category: 'CEX' },
     ],
-    agentBalances: {},
+    agentBalances: buildInitialBalances(),
     leaderboard: [],
 
     performance: {
@@ -189,7 +203,7 @@ export const useStore = create<CharacterState>()(
       else next.add(index);
       return { following: next };
     }),
-    addPost: (post) => set((state) => ({ socialFeed: [post, ...state.socialFeed].slice(0, 50) })),
+    addPost: (post) => set((state) => ({ socialFeed: [post, ...state.socialFeed].slice(0, 200) })),
     addComment: (postId, comment) => set((state) => ({
       socialFeed: state.socialFeed.map(p => p.id === postId ? { ...p, comments: [...p.comments, comment] } : p)
     })),
@@ -197,6 +211,18 @@ export const useStore = create<CharacterState>()(
       socialFeed: state.socialFeed.map(p => p.id === postId ? { ...p, likes: p.likes + 1 } : p)
     })),
     setActiveSocialAgentIndex: (index) => set({ activeSocialAgentIndex: index }),
+
+    // ADK Agent Tracking
+    markAgentAsADK: (agentIndex: number) => set((state) => {
+      const next = new Set(state.activeADKAgents);
+      next.add(agentIndex);
+      return { activeADKAgents: next };
+    }),
+    unmarkAgentAsADK: (agentIndex: number) => set((state) => {
+      const next = new Set(state.activeADKAgents);
+      next.delete(agentIndex);
+      return { activeADKAgents: next };
+    }),
 
     // Game Actions
     buyProperty: (agentIndex, tileId) => set((state) => {

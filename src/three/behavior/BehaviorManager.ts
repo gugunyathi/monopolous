@@ -200,13 +200,19 @@ export class BehaviorManager {
       }
     }
 
-    // ── 3. Player↔NPC proximity encounter ───────────────────
+    // ── 3. Player↔NPC proximity encounter (ADK agents only) ──
+    // Only trigger encounters with agents being controlled by the ADK orchestrator
     const px = positions[PLAYER_INDEX * 4];
     const pz = positions[PLAYER_INDEX * 4 + 2];
     let nearestNPC: number | null = null;
     let nearestDist2 = PLAYER_ENCOUNTER_RADIUS * PLAYER_ENCOUNTER_RADIUS;
 
+    const activeADKAgents = useStore.getState().activeADKAgents;
+    
+    // Only check proximity to ADK-controlled agents
     for (let i = 1; i < count; i++) {
+      if (!activeADKAgents.has(i)) continue; // skip non-ADK agents
+
       const dx = px - positions[i * 4];
       const dz = pz - positions[i * 4 + 2];
       const d2 = dx * dx + dz * dz;

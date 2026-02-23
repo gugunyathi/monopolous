@@ -10,6 +10,8 @@ import { SceneManager } from './three/SceneManager';
 import UIOverlay from './components/UIOverlay';
 import { startBroadcastScheduler, stopBroadcastScheduler } from './services/broadcastService';
 import { startPostScheduler, stopPostScheduler } from './services/postGeneratorService';
+import { startWalletSimulator, stopWalletSimulator } from './services/walletSimulatorService';
+import { startADKOrchestrator, stopADKOrchestrator } from './services/adk/orchestrator';
 
 const App: React.FC = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -25,6 +27,8 @@ const App: React.FC = () => {
     }
     startBroadcastScheduler();
     startPostScheduler();
+    startWalletSimulator();
+    startADKOrchestrator();
 
     return () => {
       if (managerRef.current) {
@@ -33,11 +37,13 @@ const App: React.FC = () => {
       }
       stopBroadcastScheduler();
       stopPostScheduler();
+      stopWalletSimulator();
+      stopADKOrchestrator();
     };
   }, []);
 
   return (
-    <div className="relative w-screen h-screen bg-white overflow-hidden">
+    <div className="relative w-screen h-screen bg-white overflow-hidden" style={{ height: '100dvh' }}>
       {/* Three.js Container */}
       <div ref={canvasRef} className="absolute inset-0 w-full h-full" />
       

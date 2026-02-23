@@ -38,7 +38,7 @@ const CameraControls: React.FC = () => {
     <motion.div 
       initial={{ x: 100, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      className="fixed bottom-20 md:bottom-24 right-4 md:right-8 flex flex-col gap-1.5 md:gap-2 z-[100] pointer-events-auto"
+      className="fixed bottom-[4.5rem] sm:bottom-20 md:bottom-24 left-3 sm:left-4 md:left-auto md:right-8 flex flex-col gap-1.5 md:gap-2 z-[100] pointer-events-auto"
     >
       <button 
         onClick={handleZoomIn}

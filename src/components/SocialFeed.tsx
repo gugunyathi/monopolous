@@ -41,9 +41,10 @@ const SocialFeed: React.FC = () => {
     <div 
       ref={containerRef}
       className="fixed inset-0 bg-transparent z-[100] overflow-y-scroll snap-y snap-mandatory scrollbar-hide pointer-events-auto"
+      style={{ height: '100dvh' }}
     >
       {socialFeed.length === 0 ? (
-        <div className="h-screen w-full flex flex-col items-center justify-center text-white p-8 text-center bg-black/60 backdrop-blur-md">
+        <div className="h-screen w-full flex flex-col items-center justify-center text-white p-8 text-center bg-black/60 backdrop-blur-md" style={{ height: '100dvh' }}>
           <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mb-4" />
           <p className="text-zinc-400 font-bold uppercase tracking-widest text-xs">Waiting for agents to go live...</p>
         </div>
@@ -65,7 +66,8 @@ const SocialPost: React.FC<{ post: any }> = ({ post }) => {
   return (
     <div 
       data-agent-index={post.agentIndex}
-      className="h-screen w-full snap-start relative flex flex-col items-center justify-center bg-transparent overflow-hidden"
+      className="w-full snap-start relative flex flex-col items-center justify-center bg-transparent overflow-hidden"
+      style={{ height: '100dvh' }}
     >
       {/* Dark overlay to make 3D scene look like a background video */}
       <div className="absolute inset-0 bg-black/20 pointer-events-none" />
@@ -173,7 +175,7 @@ const SocialPost: React.FC<{ post: any }> = ({ post }) => {
       )}
 
       {/* Bottom Info */}
-      <div className="absolute bottom-0 left-0 w-full p-4 md:p-8 pb-20 md:pb-24 bg-gradient-to-t from-black/80 to-transparent z-20">
+      <div className="absolute bottom-0 left-0 w-full p-4 md:p-8 pb-24 md:pb-28 bg-gradient-to-t from-black/80 to-transparent z-20">
         <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
           <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center font-black text-white text-sm md:text-base">
             {agent.role[0]}
@@ -205,7 +207,7 @@ const SocialPost: React.FC<{ post: any }> = ({ post }) => {
       </div>
 
       {/* Side Actions */}
-      <div className="absolute right-2 md:right-4 bottom-28 md:bottom-32 flex flex-col gap-4 md:gap-6 z-30">
+      <div className="absolute right-2 md:right-4 bottom-32 sm:bottom-32 md:bottom-36 flex flex-col gap-4 md:gap-6 z-30">
         <button 
           onClick={() => likePost(post.id)}
           className="flex flex-col items-center gap-1 group"

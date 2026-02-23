@@ -49,7 +49,10 @@ const UIOverlay: React.FC = () => {
   return (
     <div className="fixed inset-0 pointer-events-none flex flex-col justify-between p-4 md:p-8">
       {/* Top Bar: Sign In with Base */}
-      <div className="fixed top-4 right-4 md:top-6 md:right-6 flex items-center gap-2 pointer-events-auto z-[130]">
+      <div
+        className="fixed right-3 sm:right-4 md:right-6 flex items-center gap-2 pointer-events-auto z-[130]"
+        style={{ top: 'max(env(safe-area-inset-top, 0px) + 12px, 16px)' }}
+      >
         <SignInButton />
       </div>
 
@@ -72,7 +75,7 @@ const UIOverlay: React.FC = () => {
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -100, opacity: 0 }}
-            className="fixed top-20 md:top-24 left-1/2 -translate-x-1/2 z-[120] pointer-events-auto"
+            className="fixed top-16 sm:top-20 md:top-24 left-1/2 -translate-x-1/2 z-[120] pointer-events-auto"
           >
             <button 
               onClick={() => setViewMode('social')}
@@ -89,10 +92,13 @@ const UIOverlay: React.FC = () => {
       </AnimatePresence>
 
       {/* View Mode Toggle */}
-      <div className="fixed bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 flex bg-white/80 backdrop-blur-xl p-1.5 rounded-2xl border border-black/5 shadow-2xl pointer-events-auto z-[110]">
+      <div 
+        className="fixed left-1/2 -translate-x-1/2 flex bg-white/80 backdrop-blur-xl p-1 sm:p-1.5 rounded-2xl border border-black/5 shadow-2xl pointer-events-auto z-[110] max-w-[calc(100vw-1rem)]"
+        style={{ bottom: 'max(env(safe-area-inset-bottom, 0px) + 12px, 16px)' }}
+      >
         <button 
           onClick={() => setViewMode('about')}
-          className={`flex items-center gap-1.5 md:gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+          className={`flex items-center gap-1 sm:gap-1.5 md:gap-2 px-2.5 sm:px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
             viewMode === 'about' ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-900'
           }`}
         >
@@ -101,7 +107,7 @@ const UIOverlay: React.FC = () => {
         </button>
         <button 
           onClick={() => setViewMode('world')}
-          className={`flex items-center gap-1.5 md:gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+          className={`flex items-center gap-1 sm:gap-1.5 md:gap-2 px-2.5 sm:px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
             viewMode === 'world' ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-900'
           }`}
         >
@@ -110,7 +116,7 @@ const UIOverlay: React.FC = () => {
         </button>
         <button 
           onClick={() => setViewMode('social')}
-          className={`flex items-center gap-1.5 md:gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+          className={`flex items-center gap-1 sm:gap-1.5 md:gap-2 px-2.5 sm:px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
             viewMode === 'social' ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-900'
           }`}
         >
@@ -119,7 +125,7 @@ const UIOverlay: React.FC = () => {
         </button>
         <button 
           onClick={() => setViewMode('posts')}
-          className={`flex items-center gap-1.5 md:gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+          className={`flex items-center gap-1 sm:gap-1.5 md:gap-2 px-2.5 sm:px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
             viewMode === 'posts' ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-900'
           }`}
         >
@@ -219,7 +225,7 @@ const UIOverlay: React.FC = () => {
 
       {/* NPC Info Panel — shown when an NPC is selected */}
       {selectedAgent && (
-        <div className="absolute bottom-20 md:bottom-8 left-4 md:left-8 w-[calc(100%-2rem)] md:w-72 bg-white/85 backdrop-blur-2xl rounded-2xl border border-black/5 shadow-2xl p-4 md:p-5 pointer-events-auto animate-in fade-in slide-in-from-left-4 duration-300 z-30 overflow-hidden max-h-[50vh] md:max-h-none overflow-y-auto">
+        <div className="absolute bottom-[4.5rem] sm:bottom-20 md:bottom-8 left-3 sm:left-4 md:left-8 w-[calc(100%-1.5rem)] sm:w-[calc(100%-2rem)] md:w-72 bg-white/85 backdrop-blur-2xl rounded-2xl border border-black/5 shadow-2xl p-3 sm:p-4 md:p-5 pointer-events-auto animate-in fade-in slide-in-from-left-4 duration-300 z-30 overflow-hidden max-h-[45vh] sm:max-h-[50vh] md:max-h-[70vh] overflow-y-auto">
           {/* Color accent bar */}
           <div 
             className="absolute top-0 left-0 w-full h-1" 

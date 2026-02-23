@@ -172,7 +172,10 @@ const ChatPanel: React.FC = () => {
       </div>
 
       {/* Input */}
-      <div className="p-4 md:p-8 border-t border-zinc-50">
+      <div 
+        className="p-3 sm:p-4 md:p-8 border-t border-zinc-50"
+        style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 0px) + 1rem)' }}
+      >
         <div className="relative flex items-center gap-2">
           <div className="flex-1 relative">
             <textarea

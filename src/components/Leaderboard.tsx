@@ -26,7 +26,8 @@ const PRESET_AMOUNTS = [1, 5, 10, 50];
 
 const Leaderboard: React.FC = () => {
   const { leaderboard, agentBalances, viewMode, updateBalance, updateLeaderboard, userAddress, setUserAddress } = useStore();
-  const [collapsed, setCollapsed] = useState(false);
+  // Collapse by default on mobile screens to avoid blocking the 3D world
+  const [collapsed, setCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [fundingIndex, setFundingIndex] = useState<number | null>(null);
   const [selectedAmount, setSelectedAmount] = useState<number>(5);
   const [payState, setPayState] = useState<'idle' | 'success' | 'error'>('idle');
@@ -88,7 +89,7 @@ const Leaderboard: React.FC = () => {
       <motion.div
         initial={{ x: 300, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
-        className="fixed top-20 md:top-24 right-4 md:right-8 w-56 md:w-64 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/10 z-[100] pointer-events-auto overflow-hidden"
+        className="fixed top-16 sm:top-20 md:top-24 right-3 sm:right-4 md:right-8 w-48 sm:w-56 md:w-64 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/10 z-[100] pointer-events-auto overflow-hidden max-h-[80vh]"
       >
         {/* Header */}
         <button
@@ -115,7 +116,7 @@ const Leaderboard: React.FC = () => {
               transition={{ duration: 0.2, ease: 'easeInOut' }}
               className="overflow-hidden"
             >
-              <div className="px-3 md:px-4 pb-3 md:pb-4 space-y-2 md:space-y-3">
+              <div className="px-3 md:px-4 pb-3 md:pb-4 space-y-2 md:space-y-3 overflow-y-auto max-h-[50vh]">
                 {leaderboard.map((entry, i) => {
                   const agent = AGENTS[entry.agentIndex];
                   const startBal = agent.wallet.balance;

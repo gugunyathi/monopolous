@@ -25,6 +25,7 @@ import {
 import { BoidsParams, AgentBehavior } from '../../types';
 import { AgentStateBuffer } from '../behavior/AgentStateBuffer';
 import { AGENTS, PLAYER_INDEX } from '../../data/agents';
+import { useStore } from '../../store/useStore';
 
 export class CharacterManager {
   private instanceCount = 100;
@@ -63,6 +64,9 @@ export class CharacterManager {
   private idleDuration = 0;
   private waveDuration = 0;
   private numBones = 0;
+
+  // ADK Agent Badges — floating sprites above autonomous agents
+  private badgeSprites: THREE.Sprite[] = [];
 
   // Uniforms
   private uSpeed = uniform(0.015);
@@ -151,6 +155,7 @@ export class CharacterManager {
     // Always create instances — agents must be visible regardless of model quality
     this.initInstances();
     this.isLoaded = true;
+    this.initBadges();
     console.log('[CharacterManager] Ready — instances:', this.instanceCount,
       'hasAnimations:', !!(this.bakedWalkBuffer && this.bakedIdleBuffer && this.bakedWaveBuffer));
   }
@@ -216,6 +221,80 @@ export class CharacterManager {
       console.warn('[CharacterManager] update() called but no computeNode');
       this._firstUpdate = false;
     }
+
+    // Update badge positions for ADK agents
+    this.updateBadges();
+  }
+
+  /**
+   * Create floating sprite badges for all agents.
+   * Initially all badges are hidden (scale 0).
+   */
+  private initBadges() {
+    // Create a canvas texture for the brain emoji badge
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = '#8b5cf6'; // violet background
+      ctx.beginPath();
+      ctx.arc(64, 64, 60, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = 'bold 64px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🧠', 64, 64);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+
+    // Create sprite for each agent
+    for (let i = 0; i < this.instanceCount; i++) {
+      const spriteMaterial = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthWrite: false,
+        sizeAttenuation: true,
+      });
+
+      const sprite = new THREE.Sprite(spriteMaterial);
+      sprite.scale.set(0, 0, 1); // hidden by default
+      sprite.renderOrder = 1000; // render on top
+      this.scene.add(sprite);
+      this.badgeSprites.push(sprite);
+    }
+
+    console.log('[CharacterManager] Created', this.badgeSprites.length, 'ADK badge sprites');
+  }
+
+  /**
+   * Update badge positions to follow ADK agents.
+   * Badges float 1.2 units above the agent's head.
+   */
+  private updateBadges() {
+    if (!this.debugPosArray || this.badgeSprites.length === 0) return;
+
+    const activeADKAgents = useStore.getState().activeADKAgents;
+
+    for (let i = 0; i < this.instanceCount; i++) {
+      const sprite = this.badgeSprites[i];
+      if (!sprite) continue;
+
+      if (activeADKAgents.has(i)) {
+        // Show badge — position it above the agent
+        const px = this.debugPosArray[i * 4 + 0];
+        const py = this.debugPosArray[i * 4 + 1] || 0;
+        const pz = this.debugPosArray[i * 4 + 2];
+
+        sprite.position.set(px, py + 1.2, pz);
+        sprite.scale.set(0.6, 0.6, 1); // visible size
+      } else {
+        // Hide badge
+        sprite.scale.set(0, 0, 1);
+      }
+    }
   }
 
   private cleanupInstances() {
@@ -224,6 +303,14 @@ export class CharacterManager {
       this.instancedMesh = null;
     }
     this.computeNode = null;
+
+    // Clean up badges
+    for (const sprite of this.badgeSprites) {
+      this.scene.remove(sprite);
+      sprite.material.dispose();
+      if (sprite.material.map) sprite.material.map.dispose();
+    }
+    this.badgeSprites = [];
   }
 
   private initInstances() {

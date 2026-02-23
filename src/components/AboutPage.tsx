@@ -92,7 +92,7 @@ const AboutPage: React.FC = () => {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.5 }}
       className="fixed inset-0 z-[100] pointer-events-auto overflow-y-auto overflow-x-hidden"
-      style={{ background: 'linear-gradient(180deg, #0a0a0f 0%, #0d0d1a 40%, #0a0a0f 100%)' }}
+      style={{ background: 'linear-gradient(180deg, #0a0a0f 0%, #0d0d1a 40%, #0a0a0f 100%)', height: '100dvh' }}
     >
       {/* Animated background grid */}
       <div className="fixed inset-0 opacity-[0.03]" style={{
@@ -106,7 +106,7 @@ const AboutPage: React.FC = () => {
       <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-emerald-500/5 blur-[150px]" />
 
       {/* ─── HERO SECTION ─── */}
-      <section className="relative min-h-screen flex flex-col items-center justify-center px-6 text-center">
+      <section className="relative flex flex-col items-center justify-center px-6 text-center" style={{ minHeight: '100dvh' }}>
         {/* Badge */}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
@@ -445,7 +445,7 @@ const AboutPage: React.FC = () => {
             viewport={{ once: true }}
             className="relative rounded-3xl overflow-hidden border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent"
           >
-            <div className="aspect-video flex flex-col items-center justify-center p-10 relative">
+            <div className="min-h-[350px] sm:aspect-video flex flex-col items-center justify-center p-6 sm:p-10 relative">
               {/* Decorative floating particles */}
               {particles.map((p, i) => (
                 <motion.div

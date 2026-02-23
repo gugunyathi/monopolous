@@ -6,6 +6,7 @@ export const PLAYER_INDEX = 0;
 export const NPC_START_INDEX = 1;
 export const TOTAL_COUNT = 2000;
 export const NPC_COUNT = TOTAL_COUNT - 1; // 1999
+export const CORE_AGENT_COUNT = 100; // First 100 agents have active wallets
 
 // ─────────────────────────────────────────────────────────────
 //  Agent data types
