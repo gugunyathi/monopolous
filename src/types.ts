@@ -77,6 +77,10 @@ export interface CharacterState {
   following: Set<number>;
   tradingLog: { agentIndex: number; token: string; action: 'buy' | 'sell'; price: number; timestamp: number }[];
 
+  // Auth
+  userAddress: string | null;
+  setUserAddress: (address: string | null) => void;
+
   // Monopoly Game State
   boardTiles: BoardTile[];
   agentBalances: Record<number, number>;

@@ -1,8 +1,8 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { AGENTS } from '../data/agents';
-import { Heart, MessageCircle, Share2, UserPlus, UserCheck, TrendingUp, TrendingDown } from 'lucide-react';
+import { Heart, MessageCircle, Share2, UserPlus, UserCheck, TrendingUp, TrendingDown, X, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 const SocialFeed: React.FC = () => {
@@ -60,6 +60,7 @@ const SocialPost: React.FC<{ post: any }> = ({ post }) => {
   const { following, toggleFollow, likePost, agentBalances } = useStore();
   const agent = AGENTS[post.agentIndex];
   const isFollowing = following.has(post.agentIndex);
+  const [showComments, setShowComments] = useState(false);
 
   return (
     <div 
@@ -170,7 +171,9 @@ const SocialPost: React.FC<{ post: any }> = ({ post }) => {
           <span className="text-[10px] font-black text-white uppercase tracking-widest">{post.likes}</span>
         </button>
         
-        <button className="flex flex-col items-center gap-1">
+        <button 
+          onClick={() => setShowComments(true)}
+          className="flex flex-col items-center gap-1">
           <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white">
             <MessageCircle size={20} className="md:w-6 md:h-6" />
           </div>
@@ -184,6 +187,84 @@ const SocialPost: React.FC<{ post: any }> = ({ post }) => {
           <span className="text-[10px] font-black text-white uppercase tracking-widest">Share</span>
         </button>
       </div>
+
+      {/* Comments Modal */}
+      <AnimatePresence>
+        {showComments && (
+          <motion.div
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+            className="absolute inset-x-0 bottom-0 z-40 bg-zinc-950/95 backdrop-blur-2xl rounded-t-3xl border-t border-white/10 flex flex-col"
+            style={{ maxHeight: '70vh' }}
+          >
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-white/20" />
+            </div>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <MessageCircle size={14} className="text-white/60" />
+                <span className="text-white font-black text-xs uppercase tracking-widest">
+                  {post.comments.length} Comment{post.comments.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <button
+                onClick={() => setShowComments(false)}
+                className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
+              >
+                <X size={14} className="text-white" />
+              </button>
+            </div>
+
+            {/* Comment List */}
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 [scrollbar-width:none]">
+              {post.comments.length === 0 ? (
+                <p className="text-white/30 text-xs text-center py-8 font-bold uppercase tracking-widest">No comments yet</p>
+              ) : (
+                post.comments.map((comment: any) => {
+                  const commenter = AGENTS[comment.agentIndex];
+                  return (
+                    <div key={comment.id} className="flex items-start gap-3">
+                      <div
+                        className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white border border-white/10"
+                        style={{ backgroundColor: commenter.color }}
+                      >
+                        {commenter.role[0]}
+                      </div>
+                      <div>
+                        <div className="flex items-baseline gap-2 mb-0.5">
+                          <span className="text-white text-[10px] font-black">@{commenter.role.replace(/\s+/g, '').toLowerCase()}</span>
+                          <span className="text-white/30 text-[8px]">{new Date(comment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <p className="text-white/70 text-xs leading-relaxed">{comment.text}</p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Tap outside overlay to close */}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Tap backdrop to close comments */}
+      <AnimatePresence>
+        {showComments && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowComments(false)}
+            className="absolute inset-0 z-30"
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

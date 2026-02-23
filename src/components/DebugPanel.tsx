@@ -3,6 +3,7 @@ import React, { useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
 
 const DebugPanel: React.FC = () => {
+  const isDev = import.meta.env.DEV;
   const {
     performance,
     isDebugOpen,
@@ -157,7 +158,8 @@ const DebugPanel: React.FC = () => {
              step="1"
              value={worldSize}
              onChange={(e) => setWorldSize(parseInt(e.target.value))}
-             className="w-full h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-900"
+             disabled={!isDev}
+             className="w-full h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed"
            />
         </div>
 
@@ -173,7 +175,8 @@ const DebugPanel: React.FC = () => {
              <input type="range" min="0.01" max="0.2" step="0.001"
                value={boidsParams.speed}
                onChange={(e) => setBoidsParams({ speed: parseFloat(e.target.value) })}
-               className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-900"
+               disabled={!isDev}
+               className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed"
              />
            </div>
 
@@ -185,7 +188,8 @@ const DebugPanel: React.FC = () => {
              <input type="range" min="0.1" max="5.0" step="0.1"
                value={boidsParams.separationRadius}
                onChange={(e) => setBoidsParams({ separationRadius: parseFloat(e.target.value) })}
-               className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-900"
+               disabled={!isDev}
+               className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed"
              />
            </div>
 
@@ -197,7 +201,8 @@ const DebugPanel: React.FC = () => {
              <input type="range" min="0.01" max="0.2" step="0.01"
                value={boidsParams.separationStrength}
                onChange={(e) => setBoidsParams({ separationStrength: parseFloat(e.target.value) })}
-               className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-900"
+               disabled={!isDev}
+               className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed"
              />
            </div>
         </div>
@@ -215,7 +220,8 @@ const DebugPanel: React.FC = () => {
              step="10"
              value={instanceCount}
              onChange={(e) => setInstanceCount(parseInt(e.target.value))}
-             className="w-full h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-900"
+             disabled={!isDev}
+             className="w-full h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed"
            />
         </div>
 

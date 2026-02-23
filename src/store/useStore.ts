@@ -87,6 +87,9 @@ export const useStore = create<CharacterState>()(
     following: new Set(),
     tradingLog: [],
 
+    // Auth
+    userAddress: null,
+
     // Monopoly Game State
     boardTiles: [
       { id: '0', name: 'GENESIS', type: 'start' },
@@ -157,6 +160,7 @@ export const useStore = create<CharacterState>()(
     sendMessage: async () => {},
 
     // Social Actions
+    setUserAddress: (address) => set({ userAddress: address }),
     setViewMode: (mode) => set({ viewMode: mode }),
     toggleFollow: (index) => set((state) => {
       const next = new Set(state.following);

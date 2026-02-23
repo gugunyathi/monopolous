@@ -4,6 +4,7 @@ import { useStore } from '../store/useStore';
 import DebugPanel from './DebugPanel';
 import HelpModal from './HelpModal';
 import ChatPanel from './ChatPanel';
+import SignInButton from './SignInButton';
 import { AGENTS } from '../data/agents';
 import { LayoutGrid, Users, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -45,6 +46,11 @@ const UIOverlay: React.FC = () => {
 
   return (
     <div className="fixed inset-0 pointer-events-none flex flex-col justify-between p-4 md:p-8">
+      {/* Top Bar: Sign In with Base */}
+      <div className="fixed top-4 right-4 md:top-6 md:right-6 flex items-center gap-2 pointer-events-auto z-[130]">
+        <SignInButton />
+      </div>
+
       <AnimatePresence>
         <ChatPanel />
       </AnimatePresence>
@@ -165,22 +171,24 @@ const UIOverlay: React.FC = () => {
         </div>
       )}
 
-      {/* Top Header */}
-      <div className="flex justify-end items-start relative z-30">
-        <button
-          onClick={toggleDebug}
-          className={`pointer-events-auto px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 border ${
-            isDebugOpen
-            ? 'bg-zinc-900 text-white border-zinc-900 shadow-lg'
-            : 'bg-white/80 text-zinc-500 border-black/5 hover:bg-white hover:text-zinc-900'
-          }`}
-        >
-          {isDebugOpen ? 'Close Debug' : 'Debug'}
-        </button>
-      </div>
+      {/* Debug Button — top center, DEV only */}
+      {import.meta.env.DEV && (
+        <div className="fixed top-4 md:top-6 left-1/2 -translate-x-1/2 z-[130] pointer-events-auto">
+          <button
+            onClick={toggleDebug}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 border ${
+              isDebugOpen
+              ? 'bg-zinc-900 text-white border-zinc-900 shadow-lg'
+              : 'bg-white/80 text-zinc-500 border-black/5 hover:bg-white hover:text-zinc-900'
+            }`}
+          >
+            {isDebugOpen ? 'Close Debug' : 'Debug'}
+          </button>
+        </div>
+      )}
 
-      {/* Debug Panel Mount */}
-      <DebugPanel />
+      {/* Debug Panel Mount — DEV only */}
+      {import.meta.env.DEV && <DebugPanel />}
 
       {/* Help Modal */}
       <HelpModal isOpen={isHelpOpen} onClose={() => setHelpOpen(false)} />
