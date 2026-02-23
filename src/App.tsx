@@ -5,12 +5,17 @@
 
 
 import React, { useEffect, useRef } from 'react';
+import { sdk } from '@farcaster/miniapp-sdk';
 import { SceneManager } from './three/SceneManager';
 import UIOverlay from './components/UIOverlay';
 
 const App: React.FC = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const managerRef = useRef<SceneManager | null>(null);
+
+  useEffect(() => {
+    sdk.actions.ready();
+  }, []);
 
   useEffect(() => {
     if (canvasRef.current && !managerRef.current) {

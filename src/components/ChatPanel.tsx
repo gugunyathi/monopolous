@@ -65,11 +65,11 @@ const ChatPanel: React.FC = () => {
 
   return (
     <motion.div 
-      initial={{ x: '100%' }}
-      animate={{ x: 0 }}
-      exit={{ x: '100%' }}
+      initial={{ x: '100%', y: 0 }}
+      animate={{ x: 0, y: 0 }}
+      exit={{ x: '100%', y: 0 }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="fixed top-0 right-0 w-[400px] h-full bg-white border-l border-zinc-100 shadow-2xl z-50 flex flex-col pointer-events-auto overflow-hidden"
+      className="fixed top-0 right-0 w-full md:w-[400px] h-full md:h-full bg-white border-l border-zinc-100 shadow-2xl z-50 flex flex-col pointer-events-auto overflow-hidden"
     >
       {/* Color accent bar */}
       <div 
@@ -77,9 +77,9 @@ const ChatPanel: React.FC = () => {
         style={{ backgroundColor: agent.color }}
       />
       {/* Header */}
-      <div className="p-8 border-b border-zinc-100 flex justify-between items-start bg-white/80 backdrop-blur-md sticky top-0 z-10">
+      <div className="p-4 md:p-8 border-b border-zinc-100 flex justify-between items-start bg-white/80 backdrop-blur-md sticky top-0 z-10">
         <div className="flex flex-col gap-1">
-          <h2 className="text-3xl font-black text-zinc-900 tracking-tight">Chat</h2>
+          <h2 className="text-2xl md:text-3xl font-black text-zinc-900 tracking-tight">Chat</h2>
           <button 
             onClick={() => endChat()}
             className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-zinc-900 transition-colors group"
@@ -97,7 +97,7 @@ const ChatPanel: React.FC = () => {
       {/* Messages */}
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-8 space-y-10 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:display-none"
+        className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-10 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:display-none"
       >
         <AnimatePresence initial={false}>
           {chatMessages.map((msg, i) => (
@@ -169,7 +169,7 @@ const ChatPanel: React.FC = () => {
       </div>
 
       {/* Input */}
-      <div className="p-8 border-t border-zinc-50">
+      <div className="p-4 md:p-8 border-t border-zinc-50">
         <div className="relative flex items-center gap-2">
           <div className="flex-1 relative">
             <textarea

@@ -1,0 +1,31 @@
+{
+  "accountAssociation": {
+    "header": "",
+    "payload": "",
+    "signature": ""
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "Monopolous",
+    "homeUrl": "https://www.your-domain.com",
+    "iconUrl": "https://www.your-domain.com/icon.png",
+    "splashImageUrl": "https://www.your-domain.com/splash.png",
+    "splashBackgroundColor": "#000000",
+    "webhookUrl": "https://www.your-domain.com/api/webhook",
+    "subtitle": "AI-powered board game",
+    "description": "A high-performance 3D corporate simulation featuring autonomous agents powered by Gemini AI and WebGPU compute shaders.",
+    "screenshotUrls": [
+      "https://www.your-domain.com/screenshots/s1.png",
+      "https://www.your-domain.com/screenshots/s2.png",
+      "https://www.your-domain.com/screenshots/s3.png"
+    ],
+    "primaryCategory": "games",
+    "tags": ["monopoly", "ai", "agents", "3d", "simulation"],
+    "heroImageUrl": "https://www.your-domain.com/og-image.png",
+    "tagline": "Watch AI agents compete in real time",
+    "ogTitle": "Monopolous",
+    "ogDescription": "A high-performance 3D corporate simulation featuring autonomous agents powered by Gemini AI.",
+    "ogImageUrl": "https://www.your-domain.com/og-image.png",
+    "noindex": false
+  }
+}

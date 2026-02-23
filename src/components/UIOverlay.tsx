@@ -44,7 +44,7 @@ const UIOverlay: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 pointer-events-none flex flex-col justify-between p-8">
+    <div className="fixed inset-0 pointer-events-none flex flex-col justify-between p-4 md:p-8">
       <AnimatePresence>
         <ChatPanel />
       </AnimatePresence>
@@ -60,11 +60,11 @@ const UIOverlay: React.FC = () => {
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -100, opacity: 0 }}
-            className="fixed top-24 left-1/2 -translate-x-1/2 z-[120] pointer-events-auto"
+            className="fixed top-20 md:top-24 left-1/2 -translate-x-1/2 z-[120] pointer-events-auto"
           >
             <button 
               onClick={() => setViewMode('social')}
-              className="bg-red-600/90 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 shadow-2xl flex items-center gap-3 group hover:scale-105 transition-transform"
+              className="bg-red-600/90 backdrop-blur-md px-3 md:px-4 py-1.5 md:py-2 rounded-full border border-white/20 shadow-2xl flex items-center gap-2 md:gap-3 group hover:scale-105 transition-transform"
             >
               <div className="w-2 h-2 bg-white rounded-full animate-ping" />
               <span className="text-[10px] font-black text-white uppercase tracking-widest">
@@ -77,24 +77,24 @@ const UIOverlay: React.FC = () => {
       </AnimatePresence>
 
       {/* View Mode Toggle */}
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex bg-white/80 backdrop-blur-xl p-1.5 rounded-2xl border border-black/5 shadow-2xl pointer-events-auto z-[110]">
+      <div className="fixed bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 flex bg-white/80 backdrop-blur-xl p-1.5 rounded-2xl border border-black/5 shadow-2xl pointer-events-auto z-[110]">
         <button 
           onClick={() => setViewMode('world')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+          className={`flex items-center gap-1.5 md:gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
             viewMode === 'world' ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-900'
           }`}
         >
           <LayoutGrid size={14} />
-          World
+          <span className="hidden sm:inline">World</span>
         </button>
         <button 
           onClick={() => setViewMode('social')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+          className={`flex items-center gap-1.5 md:gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
             viewMode === 'social' ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-900'
           }`}
         >
           <Play size={14} fill="currentColor" />
-          Live
+          <span className="hidden sm:inline">Live</span>
         </button>
       </div>
       {/* Selected Bubble (Always visible when selected) */}
@@ -187,7 +187,7 @@ const UIOverlay: React.FC = () => {
 
       {/* NPC Info Panel — shown when an NPC is selected */}
       {selectedAgent && (
-        <div className="absolute bottom-8 left-8 w-72 bg-white/85 backdrop-blur-2xl rounded-2xl border border-black/5 shadow-2xl p-5 pointer-events-auto animate-in fade-in slide-in-from-left-4 duration-300 z-30 overflow-hidden">
+        <div className="absolute bottom-20 md:bottom-8 left-4 md:left-8 w-[calc(100%-2rem)] md:w-72 bg-white/85 backdrop-blur-2xl rounded-2xl border border-black/5 shadow-2xl p-4 md:p-5 pointer-events-auto animate-in fade-in slide-in-from-left-4 duration-300 z-30 overflow-hidden max-h-[50vh] md:max-h-none overflow-y-auto">
           {/* Color accent bar */}
           <div 
             className="absolute top-0 left-0 w-full h-1" 
