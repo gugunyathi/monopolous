@@ -25,8 +25,9 @@ const RISK_COLOR: Record<string, string> = {
 const PRESET_AMOUNTS = [1, 5, 10, 50];
 
 const Leaderboard: React.FC = () => {
-  const { leaderboard, agentBalances, viewMode, updateBalance, updateLeaderboard, userAddress, setUserAddress, fundingAgentIndex, setFundingAgentIndex } = useStore();
+  const { leaderboard, agentBalances, viewMode, updateBalance, updateLeaderboard, userAddress, setUserAddress } = useStore();
   const [collapsed, setCollapsed] = useState(false);
+  const [fundingIndex, setFundingIndex] = useState<number | null>(null);
   const [selectedAmount, setSelectedAmount] = useState<number>(5);
   const [payState, setPayState] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -35,17 +36,17 @@ const Leaderboard: React.FC = () => {
 
   if (viewMode !== 'world') return null;
 
-  const fundingAgent = fundingAgentIndex !== null ? AGENTS[fundingAgentIndex] : null;
+  const fundingAgent = fundingIndex !== null ? AGENTS[fundingIndex] : null;
 
   function openFund(agentIndex: number) {
-    setFundingAgentIndex(agentIndex);
+    setFundingIndex(agentIndex);
     setSelectedAmount(5);
     setPayState('idle');
     setErrorMsg('');
   }
 
   function close() {
-    setFundingAgentIndex(null);
+    setFundingIndex(null);
     setPayState('idle');
   }
 
@@ -69,8 +70,8 @@ const Leaderboard: React.FC = () => {
   }
 
   function handlePaymentResult(result: { success: boolean; transactionHash?: string; error?: string }) {
-    if (result.success && fundingAgentIndex !== null) {
-      updateBalance(fundingAgentIndex, selectedAmount);
+    if (result.success && fundingIndex !== null) {
+      updateBalance(fundingIndex, selectedAmount);
       updateLeaderboard();
       setPayState('success');
       setTimeout(close, 2500);
@@ -212,9 +213,9 @@ const Leaderboard: React.FC = () => {
 
               {/* ── Agent Summary ── */}
               {(() => {
-                const lbEntry = leaderboard.find(e => e.agentIndex === fundingAgentIndex);
+                const lbEntry = leaderboard.find(e => e.agentIndex === fundingIndex);
                 const startBal = fundingAgent.wallet.balance;
-                const liveBal = agentBalances[fundingAgentIndex!] ?? startBal;
+                const liveBal = agentBalances[fundingIndex!] ?? startBal;
                 const netWorth = lbEntry ? lbEntry.netWorth : liveBal;
                 const pnl = netWorth - startBal;
                 const pnlPct = ((pnl / startBal) * 100).toFixed(1);

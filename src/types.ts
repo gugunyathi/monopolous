@@ -152,10 +152,6 @@ export interface CharacterState {
   buyProperty: (agentIndex: number, tileId: string) => void;
   updateBalance: (agentIndex: number, amount: number) => void;
   updateLeaderboard: () => void;
-
-  // Fund Modal (shared across UIOverlay + Leaderboard)
-  fundingAgentIndex: number | null;
-  setFundingAgentIndex: (index: number | null) => void;
 }
 
 export enum AnimationName {
