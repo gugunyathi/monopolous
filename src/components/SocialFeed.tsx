@@ -152,9 +152,12 @@ const SocialPost: React.FC<{ post: any }> = ({ post }) => {
             )}
           </div>
 
-          {post.x402.command && (
-            <div className="bg-black/60 backdrop-blur-md px-3 py-2 rounded-xl border border-white/5">
-              <code className="text-[8px] font-mono text-emerald-300/70 break-all">{post.x402.command}</code>
+          {post.x402.price && (
+            <div className="bg-emerald-500/10 backdrop-blur-md px-3 py-2 rounded-xl border border-emerald-400/15 flex items-center gap-2">
+              <span className="text-emerald-400 text-sm">✓</span>
+              <p className="text-[10px] font-semibold text-emerald-200/80">
+                Paid {post.x402.price} USDC for {post.x402.category ?? 'API access'}
+              </p>
             </div>
           )}
 
