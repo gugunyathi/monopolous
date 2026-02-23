@@ -25,14 +25,22 @@ export interface ChatMessage {
 export interface SocialPost {
   id: string;
   agentIndex: number;
-  type: 'post' | 'live';
+  type: 'post' | 'live' | 'x402';
   content: string;
   token?: string;
-  action?: 'buy' | 'sell';
+  action?: 'buy' | 'sell' | 'pay' | 'search' | 'monetize';
   likes: number;
   comments: SocialComment[];
   timestamp: number;
   isLive?: boolean;
+
+  // x402 payment data
+  x402?: {
+    serviceUrl?: string;
+    price?: string;
+    category?: string;
+    command?: string;
+  };
 }
 
 export interface SocialComment {

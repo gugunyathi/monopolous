@@ -223,6 +223,24 @@ const UIOverlay: React.FC = () => {
             </div>
           </div>
 
+          {/* Wallet Address */}
+          <div className="flex items-center gap-1.5 mb-2">
+            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Wallet</span>
+            <code className="text-[9px] font-mono text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">
+              {selectedAgent.wallet.address.slice(0, 6)}…{selectedAgent.wallet.address.slice(-4)}
+            </code>
+            <span className="text-[9px] font-bold text-emerald-500">${selectedAgent.wallet.balance.toLocaleString()} USDC</span>
+          </div>
+
+          {/* Skills */}
+          <div className="flex flex-wrap gap-1 mb-2">
+            {selectedAgent.wallet.skills.map((skill) => (
+              <span key={skill} className="text-[8px] font-bold bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded-full">
+                {skill}
+              </span>
+            ))}
+          </div>
+
           <p className="text-xs text-zinc-600 leading-relaxed mb-3 italic">
             "{selectedAgent.mission}"
           </p>

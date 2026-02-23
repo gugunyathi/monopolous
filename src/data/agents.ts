@@ -10,6 +10,23 @@ export const NPC_COUNT = TOTAL_COUNT - 1; // 1999
 // ─────────────────────────────────────────────────────────────
 //  Agent data types
 // ─────────────────────────────────────────────────────────────
+export type WalletSkill =
+  | 'authenticate-wallet'
+  | 'fund'
+  | 'send-usdc'
+  | 'trade'
+  | 'pay-for-service'
+  | 'search-for-service'
+  | 'monetize-service'
+  | 'x402';
+
+export interface AgentWallet {
+  address: string;            // 0x… Ethereum address on Base
+  skills: WalletSkill[];      // agentic-wallet skills this agent can use
+  balance: number;            // USDC balance (display only for NPCs)
+  chain: 'base' | 'base-sepolia';
+}
+
 export interface AgentData {
   index: number;
   department: string;
@@ -20,6 +37,9 @@ export interface AgentData {
   isPlayer: boolean;
   color: string;
   
+  // Wallet
+  wallet: AgentWallet;
+
   // Trading Profile
   traderPersonality: string;
   tradingStyle: string;
@@ -260,6 +280,77 @@ const TRADER_PROFILES = [
 ];
 
 // ─────────────────────────────────────────────────────────────
+//  Wallet helpers
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Deterministic pseudo-random wallet address per agent index.
+ * Uses a simple hash to produce a valid-looking 0x address.
+ * The player (index 0) gets a placeholder that is replaced at
+ * runtime once they authenticate via `npx awal auth login`.
+ */
+function generateWalletAddress(index: number): string {
+  // Simple deterministic hash → 40 hex chars
+  let h = 0x811c9dc5; // FNV offset basis
+  const data = `monopolous-agent-${index}`;
+  for (let i = 0; i < data.length; i++) {
+    h ^= data.charCodeAt(i);
+    h = Math.imul(h, 0x01000193); // FNV prime
+  }
+  // Expand to 40 hex characters (20 bytes) by running multiple rounds
+  let hex = '';
+  for (let round = 0; round < 5; round++) {
+    let v = h ^ (round * 0x9e3779b9);
+    v = Math.imul(v, 0x01000193);
+    hex += (v >>> 0).toString(16).padStart(8, '0');
+  }
+  return '0x' + hex.slice(0, 40);
+}
+
+/** Assign wallet skills based on department / role. */
+function assignWalletSkills(dept: string, riskLevel: string, isPlayer: boolean): WalletSkill[] {
+  // Every agent can authenticate and check balance
+  const base: WalletSkill[] = ['authenticate-wallet'];
+
+  if (isPlayer) {
+    // Player gets all skills
+    return [
+      'authenticate-wallet', 'fund', 'send-usdc', 'trade',
+      'pay-for-service', 'search-for-service', 'monetize-service', 'x402',
+    ];
+  }
+
+  // NPCs get skills based on department
+  switch (dept) {
+    case 'Executive':
+      return [...base, 'fund', 'send-usdc', 'trade', 'x402'];
+    case 'Finance':
+      return [...base, 'fund', 'send-usdc', 'trade', 'pay-for-service'];
+    case 'Sales':
+      return [...base, 'send-usdc', 'pay-for-service', 'search-for-service'];
+    case 'Marketing':
+      return [...base, 'send-usdc', 'monetize-service', 'x402'];
+    case 'Production':
+      return [...base, 'trade', 'search-for-service', 'x402'];
+    case 'People':
+      return [...base, 'send-usdc', 'fund'];
+    default:
+      return [...base, 'send-usdc'];
+  }
+}
+
+/** Starting USDC balance per risk level. */
+function startingBalance(riskLevel: string): number {
+  switch (riskLevel) {
+    case 'Degen': return 500;
+    case 'High':  return 1000;
+    case 'Medium': return 2500;
+    case 'Low':   return 5000;
+    default:      return 1500;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
 //  Generation
 // ─────────────────────────────────────────────────────────────
 function pick<T>(arr: T[], seed: number): T {
@@ -279,6 +370,12 @@ _agents.push({
   personality: 'Decisive and inspiring leader',
   isPlayer: true,
   color: '#7EACEA', // Light Blue
+  wallet: {
+    address: generateWalletAddress(0), // replaced at runtime after auth
+    skills: assignWalletSkills('Executive', 'Low', true),
+    balance: 10_000,
+    chain: 'base',
+  },
   traderPersonality: ceoProfile.personality,
   tradingStyle: ceoProfile.style,
   riskLevel: ceoProfile.risk as any,
@@ -308,6 +405,7 @@ for (let i = 1; i < TOTAL_COUNT; i++) {
   }
 
   const profile = pick(TRADER_PROFILES, i);
+  const riskLevel = profile.risk as 'Low' | 'Medium' | 'High' | 'Degen';
 
   _agents.push({
     index: i,
@@ -318,9 +416,15 @@ for (let i = 1; i < TOTAL_COUNT; i++) {
     personality: pick(PERSONALITIES, n),
     isPlayer: false,
     color: dept.color,
+    wallet: {
+      address: generateWalletAddress(i),
+      skills: assignWalletSkills(dept.name, riskLevel, false),
+      balance: startingBalance(riskLevel),
+      chain: 'base',
+    },
     traderPersonality: profile.personality,
     tradingStyle: profile.style,
-    riskLevel: profile.risk as any,
+    riskLevel: riskLevel,
     preferredTokens: profile.tokens,
     outfit: pick(profile.outfits, i)
   });

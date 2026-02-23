@@ -130,6 +130,45 @@ const SocialPost: React.FC<{ post: any }> = ({ post }) => {
         </motion.div>
       )}
 
+      {/* x402 Payment Info Overlay */}
+      {post.type === 'x402' && post.x402 && (
+        <motion.div
+          initial={{ x: -20, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          className="absolute top-1/4 left-4 md:left-8 z-20 flex flex-col gap-2 md:gap-3"
+        >
+          <div className="bg-blue-500/10 backdrop-blur-md p-3 md:p-4 rounded-2xl border border-blue-400/20">
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="p-1.5 md:p-2 rounded-lg bg-blue-500/20 text-blue-400">
+                <Share2 size={16} className="md:w-5 md:h-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-blue-300/60 uppercase tracking-widest">x402 Payment</p>
+                <p className="text-base md:text-lg font-black text-white tracking-tight">{post.x402.price} USDC</p>
+              </div>
+            </div>
+            {post.x402.category && (
+              <p className="text-[9px] font-bold text-blue-300/50 uppercase tracking-widest mt-2">{post.x402.category}</p>
+            )}
+          </div>
+
+          {post.x402.command && (
+            <div className="bg-black/60 backdrop-blur-md px-3 py-2 rounded-xl border border-white/5">
+              <code className="text-[8px] font-mono text-emerald-300/70 break-all">{post.x402.command}</code>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <div className="bg-blue-500/10 backdrop-blur-md px-3 py-1 rounded-full border border-blue-400/10">
+              <p className="text-[8px] font-black text-blue-300 uppercase tracking-widest">x402</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-md px-3 py-1 rounded-full border border-white/10">
+              <p className="text-[8px] font-black text-white uppercase tracking-widest">Base</p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Bottom Info */}
       <div className="absolute bottom-0 left-0 w-full p-4 md:p-8 pb-20 md:pb-24 bg-gradient-to-t from-black/80 to-transparent z-20">
         <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
@@ -150,8 +189,11 @@ const SocialPost: React.FC<{ post: any }> = ({ post }) => {
             </div>
             <div className="flex items-center gap-2">
               <p className="text-zinc-400 text-[10px] md:text-xs font-medium">{agent.department}</p>
-              <span className="text-emerald-400 text-[9px] md:text-[10px] font-black">Balance: ${(agentBalances[post.agentIndex] || 1500).toLocaleString()}</span>
+              <span className="text-emerald-400 text-[9px] md:text-[10px] font-black">Balance: ${(agentBalances[post.agentIndex] || agent.wallet.balance).toLocaleString()}</span>
             </div>
+            <code className="text-[8px] font-mono text-blue-300/60">
+              {agent.wallet.address.slice(0, 6)}…{agent.wallet.address.slice(-4)}
+            </code>
           </div>
         </div>
         <p className="text-white text-xs md:text-sm leading-relaxed max-w-[90%] md:max-w-[80%] line-clamp-3">
@@ -166,7 +208,7 @@ const SocialPost: React.FC<{ post: any }> = ({ post }) => {
           className="flex flex-col items-center gap-1 group"
         >
           <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white group-active:scale-125 transition-transform">
-            <Heart size={20} className="md:w-6 md:h-6" fill={post.likes > 0 ? '#ef4444' : 'transparent'} className={post.likes > 0 ? 'text-red-500' : 'text-white'} />
+            <Heart size={20} className={`md:w-6 md:h-6 ${post.likes > 0 ? 'text-red-500' : 'text-white'}`} fill={post.likes > 0 ? '#ef4444' : 'transparent'} />
           </div>
           <span className="text-[10px] font-black text-white uppercase tracking-widest">{post.likes}</span>
         </button>

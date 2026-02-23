@@ -2,6 +2,7 @@ import { AgentBehavior, ActiveEncounter } from '../../types';
 import { AgentStateBuffer } from './AgentStateBuffer';
 import { AgentData, PLAYER_INDEX } from '../../data/agents';
 import { useStore } from '../../store/useStore';
+import { simulateX402Purchase, pickServiceForAgent } from '../../services/x402Service';
 
 // ── Tuning constants ─────────────────────────────────────────
 const PLAYER_ENCOUNTER_RADIUS = 2.5;       // world units — player↔NPC proximity trigger
@@ -9,6 +10,7 @@ const ARRIVAL_RADIUS = 0.5;                // world units — waypoint considere
 const TILE_PAUSE_MIN_MS = 400;             // ms an NPC pauses on a tile before moving on
 const TILE_PAUSE_MAX_MS = 1800;            // ms maximum pause on a tile
 const SAME_TILE_CHAT_MS = 2500;            // ms two NPCs "chat" when on the same tile
+const X402_CHANCE = 0.08;                  // 8% chance an NPC makes an x402 payment when pausing
 const NUM_BOARD_TILES = 32;                // perimeter tiles on the board
 const TILE_JITTER = 0.35;                  // fraction of tileSize — keeps agents visually on their tile
 
@@ -18,6 +20,7 @@ export class BehaviorManager {
   private npcArrivalTime = new Map<number, number>();
   private npcPauseDuration = new Map<number, number>();
   private npcJitter = new Map<number, { x: number; z: number }>();
+  private npcLastX402 = new Map<number, number>();  // timestamp of last x402 action
 
   private chatNPC: number | null = null;
   private currentEncounterNPC: number | null = null;
@@ -134,6 +137,33 @@ export class BehaviorManager {
         const effectivePause = inTileChat ? Math.max(pause, SAME_TILE_CHAT_MS) : pause;
 
         if (now - arrivalTime >= effectivePause) {
+          // ── x402 payment simulation ──────────────────────
+          const lastX402 = this.npcLastX402.get(i) ?? 0;
+          if (Math.random() < X402_CHANCE && now - lastX402 > 30_000) {
+            this.npcLastX402.set(i, now);
+            const service = pickServiceForAgent(i);
+            const result = simulateX402Purchase(i, service);
+            if (result.canPay) {
+              const store = useStore.getState();
+              store.addPost({
+                id: `x402-${i}-${now}`,
+                agentIndex: i,
+                type: 'x402',
+                content: result.postContent,
+                action: 'pay',
+                likes: 0,
+                comments: [],
+                timestamp: now,
+                x402: {
+                  serviceUrl: service.url,
+                  price: service.price,
+                  category: service.category,
+                  command: result.commands[2], // the pay command
+                },
+              });
+            }
+          }
+
           // Roll dice and start walking tile-by-tile toward the destination
           const roll = 1 + Math.floor(Math.random() * 6);
           const currentTile = this.npcTileIndex.get(i) ?? 0;

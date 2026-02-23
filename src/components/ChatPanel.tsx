@@ -91,6 +91,9 @@ const ChatPanel: React.FC = () => {
         <div className="text-right">
           <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">{agent.department}</p>
           <h3 className="text-lg font-black text-zinc-900 leading-tight">{agent.role}</h3>
+          <code className="text-[8px] font-mono text-blue-400 mt-0.5 block">
+            {agent.wallet.address.slice(0, 6)}…{agent.wallet.address.slice(-4)}
+          </code>
         </div>
       </div>
 
