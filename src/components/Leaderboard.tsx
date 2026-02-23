@@ -118,28 +118,42 @@ const Leaderboard: React.FC = () => {
               <div className="px-3 md:px-4 pb-3 md:pb-4 space-y-2 md:space-y-3">
                 {leaderboard.map((entry, i) => {
                   const agent = AGENTS[entry.agentIndex];
+                  const startBal = agent.wallet.balance;
+                  const pnl = entry.netWorth - startBal;
+                  const pnlPct = ((pnl / startBal) * 100).toFixed(1);
+                  const isProfit = pnl >= 0;
                   return (
                     <button
                       key={entry.agentIndex}
                       onClick={() => openFund(entry.agentIndex)}
                       className="w-full flex items-center justify-between group rounded-xl px-2 py-1.5 -mx-2 hover:bg-white/5 active:bg-white/10 transition-colors cursor-pointer"
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black text-white/40 w-4">{i + 1}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[10px] font-black text-white/40 w-4 shrink-0">{i + 1}</span>
                         <div
-                          className="w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-black text-white border border-white/10"
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-black text-white border border-white/10 shrink-0"
                           style={{ backgroundColor: agent.color }}
                         >
                           {agent.role[0]}
                         </div>
-                        <div className="text-left">
-                          <p className="text-white text-[9px] md:text-[10px] font-bold truncate w-20 md:w-24">@{agent.role.replace(/\s+/g, '').toLowerCase()}</p>
-                          <p className="text-white/40 text-[7px] md:text-[8px] uppercase tracking-widest">{agent.department}</p>
+                        <div className="text-left min-w-0">
+                          <p className="text-white text-[9px] md:text-[10px] font-bold truncate w-16 md:w-20">@{agent.role.replace(/\s+/g, '').toLowerCase()}</p>
+                          <p className="text-white/40 text-[7px] md:text-[8px] uppercase tracking-widest truncate">{agent.department}</p>
                           <p className="text-blue-400/50 text-[6px] md:text-[7px] font-mono">{agent.wallet.address.slice(0, 6)}…{agent.wallet.address.slice(-4)}</p>
                         </div>
                       </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <p className="text-emerald-400 text-[9px] md:text-[10px] font-black">${entry.netWorth.toLocaleString()}</p>
+                      {/* PnL % column */}
+                      <div className="flex flex-col items-center shrink-0 mx-1.5">
+                        <span className={`text-[8px] md:text-[9px] font-black tabular-nums ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {isProfit ? '+' : ''}{pnlPct}%
+                        </span>
+                        <span className={`text-[6px] font-black uppercase tracking-widest ${isProfit ? 'text-emerald-600' : 'text-red-600'}`}>
+                          PnL
+                        </span>
+                      </div>
+                      {/* Net worth + fund */}
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <p className="text-white text-[9px] md:text-[10px] font-black">${entry.netWorth.toLocaleString()}</p>
                         <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[7px] font-black uppercase tracking-widest transition-all bg-white/5 text-white/30 group-hover:bg-blue-500/20 group-hover:text-blue-300">
                           <Zap size={7} /> Fund
                         </span>
