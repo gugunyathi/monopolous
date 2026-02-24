@@ -216,6 +216,95 @@ function generateStake(): ActivityResult {
   };
 }
 
+// ─── Prediction Market Post / Bet ────────────────────────────────────────────
+
+const FALLBACK_POLY_QUESTIONS = [
+  'Will Bitcoin hit $150k by end of 2026?',
+  'Will ETH outperform BTC in 2026?',
+  'Will the Federal Reserve cut rates before June 2026?',
+  'Will DeFi TVL exceed $200B this year?',
+  'Will Solana flip Ethereum in market cap by 2027?',
+  'Will a major CEX get hacked for >$100M in 2026?',
+  'Will a crypto ETF launch in Asia before 2027?',
+  'Will BTC dominance stay above 50% for 2026?',
+  'Will memecoins outperform blue chips in Q2 2026?',
+  'Will the total crypto market cap hit $10T by 2027?',
+];
+
+const POLY_OPINIONS = [
+  'My call based on on-chain data',
+  'Models pointing strongly',
+  'Risk-adjusted this makes sense',
+  'This lines up with my macro view',
+  'Chart is sending signals',
+  'GM — taking a position here',
+  'Thesis: liquidity cycle supports',
+  'Conviction play based on flow',
+];
+
+/**
+ * Generates a prediction market post or places a simulated Polymarket bet.
+ * Uses live polymarketData from store if available; falls back to hardcoded topics.
+ */
+function generateAndFirePredictionAction(): void {
+  const agentIndex = pickCoreAgent();
+  const agent = AGENTS[agentIndex];
+  const store = useStore.getState();
+  const markets = store.polymarketData;
+  const now = Date.now();
+
+  if (markets.length === 0) {
+    // No live data yet — post a prediction opinion
+    const question = pick(FALLBACK_POLY_QUESTIONS);
+    const side = Math.random() < 0.55 ? 'YES' : 'NO';
+    const opinion = pick(POLY_OPINIONS);
+    const emojis = ['🎯', '🔮', '📊', '🧠', '💬', '🔥'];
+
+    store.addPost({
+      id: `pred-opinion-${agentIndex}-${now}`,
+      agentIndex,
+      type: 'post',
+      content:
+        `${pick(emojis)} Polymarket call: **${side}** on\n"${question}"\n\n${opinion}. ${agent.personality.split('.')[0]}.`,
+      token: '',
+      action: undefined,
+      likes: Math.floor(Math.random() * 25),
+      comments: [],
+      timestamp: now,
+      postCategory: 'prediction',
+    });
+    return;
+  }
+
+  const market = markets[Math.floor(Math.random() * markets.length)];
+  const balance = store.agentBalances[agentIndex] ?? agent.wallet.balance;
+
+  if (balance < 5) {
+    // Too broke to bet — just post an opinion
+    const side = Math.random() < 0.5 ? 'YES' : 'NO';
+    store.addPost({
+      id: `pred-opinion-${agentIndex}-${now}`,
+      agentIndex,
+      type: 'post',
+      content:
+        `🎯 Polymarket: I’d go **${side}** on\n"${market.question.slice(0, 80)}"\n\n(Can’t bet rn, wallet thin 😂)`,
+      token: '',
+      action: undefined,
+      likes: Math.floor(Math.random() * 15),
+      comments: [],
+      timestamp: now,
+      postCategory: 'prediction',
+    });
+    return;
+  }
+
+  // Place an actual simulated bet
+  const side = Math.random() < 0.5 ? 'YES' : 'NO';
+  const betAmount = Math.max(1, Math.round(balance * (0.02 + Math.random() * 0.06) * 100) / 100);
+  const price = market.outcomePrices?.[0] ? parseFloat(market.outcomePrices[0]) : 0.5;
+  store.placePredictionBet(agentIndex, market.id, market.question, side, betAmount, price);
+}
+
 // ─── Activity Dispatcher ─────────────────────────────────────────────────────
 
 /** Weighted random activity selection */
@@ -307,6 +396,11 @@ let batchHandle: ReturnType<typeof setTimeout> | null = null;
 
 /** Fire a single wallet activity */
 function fireWalletActivity() {
+  // 10% of the time, fire a prediction market action instead
+  if (Math.random() < 0.10) {
+    generateAndFirePredictionAction();
+    return;
+  }
   const result = generateActivity();
   executeActivity(result);
 }

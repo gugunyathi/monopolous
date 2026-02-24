@@ -109,6 +109,23 @@ export class BehaviorManager {
             this.npcArrivalTime.set(i, now);
             const pause = TILE_PAUSE_MIN_MS + Math.random() * (TILE_PAUSE_MAX_MS - TILE_PAUSE_MIN_MS);
             this.npcPauseDuration.set(i, pause);
+
+            // ── Prediction tile: auto-place a Polymarket bet ───────────────
+            const { boardTiles, polymarketData, placePredictionBet, agentBalances } = useStore.getState();
+            const landedTile = boardTiles[currentTile % boardTiles.length];
+            if (
+              landedTile?.type === 'prediction' &&
+              polymarketData.length > 0 &&
+              Math.random() < 0.25
+            ) {
+              const market = polymarketData[Math.floor(Math.random() * polymarketData.length)];
+              const side = Math.random() < 0.5 ? 'YES' : 'NO';
+              const balance = agentBalances[i] ?? 500;
+              const betAmount = Math.max(1, Math.round(balance * (0.03 + Math.random() * 0.07) * 100) / 100);
+              const price = market.outcomePrices?.[0] ? parseFloat(market.outcomePrices[0]) : 0.5;
+              placePredictionBet(i, market.id, market.question, side as 'YES' | 'NO', betAmount, price);
+              console.log(`[BehaviorManager] 🎯 Agent #${i} bet ${side} on "${market.question.slice(0, 40)}..."`);
+            }
           }
         }
       } else if (state === AgentBehavior.FROZEN) {

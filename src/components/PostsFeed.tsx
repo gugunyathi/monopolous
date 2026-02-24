@@ -7,7 +7,7 @@ import {
   X, Megaphone, AlertTriangle, Rocket, Brain, Users, Newspaper,
   HandCoins, Gem, Target, Laugh, Skull, Gift, Filter,
   DollarSign, Zap, ChevronDown, ArrowUp, Flame, Hash,
-  Crown, BarChart3,
+  Crown, BarChart3, Activity,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -265,6 +265,9 @@ const PostsFeed: React.FC = () => {
         {/* ─── Trending Section ─── */}
         <TrendingSection trending={trending} onFilterToken={(token) => setActiveFilter('all')} />
 
+        {/* ─── Live Predictions Panel ─── */}
+        <PredictionsPanel />
+
         {/* ─── Posts ─── */}
         <div className="space-y-3 mt-3">
           {posts.length === 0 ? (
@@ -279,6 +282,112 @@ const PostsFeed: React.FC = () => {
           )}
         </div>
       </div>
+    </div>
+  );
+};
+
+// ─── Live Predictions Panel ──────────────────────────────────────────────
+
+const PredictionsPanel: React.FC = () => {
+  const { polymarketData, polymarketBets } = useStore();
+  const [expanded, setExpanded] = useState(true);
+
+  if (!polymarketData || polymarketData.length === 0) return null;
+
+  return (
+    <div className="mb-3">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-2 mb-2 group w-full"
+      >
+        <Target size={14} className="text-fuchsia-400" />
+        <span className="text-[10px] font-black text-fuchsia-400 uppercase tracking-widest">Live Prediction Markets</span>
+        <div className="w-1.5 h-1.5 rounded-full bg-fuchsia-400 animate-pulse" />
+        <span className="text-[8px] font-bold text-zinc-600">{polymarketData.length} markets</span>
+        <div className="flex-1 h-px bg-white/5" />
+        <ChevronDown size={12} className={`text-zinc-600 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              {polymarketData.slice(0, 8).map((market) => {
+                const yesPct = market.outcomePrices?.[0]
+                  ? Math.round(parseFloat(market.outcomePrices[0]) * 100)
+                  : 50;
+                const noPct = 100 - yesPct;
+                const vol = market.volume
+                  ? `$${(parseFloat(market.volume) / 1_000_000).toFixed(1)}M`
+                  : '?';
+                const end = market.endDate
+                  ? new Date(market.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  : null;
+                const betsCount = polymarketBets.filter((b) => b.marketId === market.id).length;
+                const yesBets = polymarketBets.filter((b) => b.marketId === market.id && b.side === 'YES').length;
+                const noBets = betsCount - yesBets;
+
+                return (
+                  <div
+                    key={market.id}
+                    className="shrink-0 bg-zinc-950/90 border border-fuchsia-500/15 rounded-2xl p-3 min-w-[210px] max-w-[260px]"
+                  >
+                    {/* Question */}
+                    <p className="text-white/80 text-[10px] font-bold leading-tight mb-2.5 line-clamp-2 min-h-[28px]">
+                      {market.question}
+                    </p>
+
+                    {/* YES/NO probability bar */}
+                    <div className="flex h-2 rounded-full overflow-hidden mb-1 bg-zinc-800">
+                      <div
+                        style={{ width: `${yesPct}%` }}
+                        className="bg-emerald-500 transition-all duration-500 shrink-0"
+                      />
+                      <div
+                        style={{ width: `${noPct}%` }}
+                        className="bg-red-500 transition-all duration-500 shrink-0"
+                      />
+                    </div>
+
+                    {/* YES / NO labels */}
+                    <div className="flex justify-between mb-2">
+                      <span className="text-emerald-400 text-[9px] font-black">YES {yesPct}¢</span>
+                      <span className="text-red-400 text-[9px] font-black">NO {noPct}¢</span>
+                    </div>
+
+                    {/* Meta row */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Activity size={8} className="text-zinc-600" />
+                        <span className="text-zinc-600 text-[8px] font-bold">{vol}</span>
+                        {end && (
+                          <>
+                            <span className="text-zinc-700 text-[8px]">·</span>
+                            <span className="text-zinc-600 text-[8px]">{end}</span>
+                          </>
+                        )}
+                      </div>
+                      {betsCount > 0 && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-emerald-500 text-[8px] font-black">{yesBets}Y</span>
+                          <span className="text-zinc-600 text-[7px]">/</span>
+                          <span className="text-red-500 text-[8px] font-black">{noBets}N</span>
+                          <span className="text-fuchsia-500 text-[7px] font-bold ml-0.5">agents</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -416,6 +525,7 @@ const PostCard: React.FC<{ post: SocialPostType }> = ({ post }) => {
   const catConfig = CATEGORY_CONFIG[category];
   const isAd = category === 'advertisement';
   const isCEO = post.agentIndex === 0;
+  const isPrediction = !!(post.polymarket && post.polymarket.amount > 0);
 
   const timeAgo = getTimeAgo(post.timestamp);
 
@@ -424,7 +534,9 @@ const PostCard: React.FC<{ post: SocialPostType }> = ({ post }) => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className={`rounded-2xl border overflow-hidden ${
-        isAd
+        isPrediction
+          ? 'bg-gradient-to-br from-purple-950/60 to-zinc-950/80 border-fuchsia-500/20'
+          : isAd
           ? 'bg-gradient-to-br from-green-950/60 to-zinc-950/80 border-green-500/20'
           : isCEO
             ? 'bg-gradient-to-br from-sky-950/60 to-zinc-950/80 border-sky-500/20'
@@ -494,6 +606,56 @@ const PostCard: React.FC<{ post: SocialPostType }> = ({ post }) => {
 
         {/* Content */}
         <p className="text-white/90 text-sm leading-relaxed mb-3">{post.content}</p>
+
+        {/* Polymarket Bet Card */}
+        {post.polymarket && post.polymarket.amount > 0 && (
+          <div className="mb-3 bg-fuchsia-950/40 border border-fuchsia-500/15 rounded-xl p-3">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Target size={10} className="text-fuchsia-400" />
+              <span className="text-[9px] font-black text-fuchsia-400 uppercase tracking-widest">Polymarket Bet</span>
+              {post.polymarket.simulated && (
+                <span className="text-[7px] font-bold text-zinc-600 uppercase tracking-widest">simulated</span>
+              )}
+            </div>
+            <p className="text-white/60 text-[10px] font-medium leading-tight mb-2">
+              “{post.polymarket.question.slice(0, 90)}”
+            </p>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <div
+                className={`px-2 py-0.5 rounded font-black text-[9px] uppercase tracking-widest ${
+                  post.polymarket.side === 'YES'
+                    ? 'bg-emerald-500/20 text-emerald-400'
+                    : 'bg-red-500/20 text-red-400'
+                }`}
+              >
+                {post.polymarket.side}
+              </div>
+              <span className="text-zinc-400 text-[9px] font-bold">
+                ${post.polymarket.amount.toFixed(2)} USDC stake
+              </span>
+              {post.polymarket.price !== undefined && (
+                <span className="text-zinc-500 text-[9px]">
+                  @ {(post.polymarket.price * 100).toFixed(0)}¢
+                </span>
+              )}
+              {post.polymarket.potentialWin !== undefined && (
+                <span className="text-amber-400 text-[9px] font-black">
+                  → ${post.polymarket.potentialWin.toFixed(2)} if correct
+                </span>
+              )}
+            </div>
+            {post.polymarket.price !== undefined && (
+              <div className="mt-2 flex h-1 rounded-full overflow-hidden bg-zinc-800">
+                <div
+                  style={{ width: `${Math.round(post.polymarket.price * 100)}%` }}
+                  className={`${
+                    post.polymarket.side === 'YES' ? 'bg-emerald-500' : 'bg-red-500'
+                  }`}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Token & Action row */}
         {post.token && (

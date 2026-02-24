@@ -264,3 +264,72 @@ export function getYesTokenId(m: PolyMarket): string | null {
   }
   return null;
 }
+
+// ─── Background Feed Polling ──────────────────────────────────────────────────
+
+const FEED_TOPICS = ['crypto', 'bitcoin', 'ethereum', 'defi', 'federal reserve'];
+let polyFeedTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Fetch a combined set of trending + topic-specific markets.
+ * Used by the background feed and by agents.
+ */
+export async function fetchAndStorePredictionMarkets(): Promise<PolyMarket[]> {
+  try {
+    const [trending, ...topicResults] = await Promise.allSettled([
+      getTrendingMarkets(6),
+      ...FEED_TOPICS.slice(0, 3).map((t) => searchMarkets(t, 3)),
+    ]);
+
+    const seen = new Set<string>();
+    const markets: PolyMarket[] = [];
+
+    const addAll = (arr: PolyMarket[]) => {
+      for (const m of arr) {
+        if (!seen.has(m.id)) {
+          seen.add(m.id);
+          markets.push(m);
+        }
+      }
+    };
+
+    if (trending.status === 'fulfilled') addAll(trending.value);
+    for (const r of topicResults) {
+      if (r.status === 'fulfilled') addAll(r.value);
+    }
+
+    return markets.slice(0, 15);
+  } catch (err: any) {
+    console.warn('[Polymarket] fetchAndStorePredictionMarkets error:', err.message);
+    return [];
+  }
+}
+
+/**
+ * Start the background market feed. Calls `onUpdate` immediately and every 2 minutes.
+ * Safe to call multiple times — only one feed runs at a time.
+ */
+export function startPolymarketFeed(onUpdate: (markets: PolyMarket[]) => void): void {
+  if (polyFeedTimer) return;
+
+  // Initial fetch (non-blocking)
+  fetchAndStorePredictionMarkets()
+    .then(onUpdate)
+    .catch((e) => console.warn('[Polymarket] initial fetch error:', e));
+
+  polyFeedTimer = setInterval(() => {
+    fetchAndStorePredictionMarkets()
+      .then(onUpdate)
+      .catch((e) => console.warn('[Polymarket] refresh error:', e));
+  }, 120_000); // refresh every 2 minutes
+
+  console.log('[Polymarket] Feed started — refreshes every 2 minutes.');
+}
+
+/** Stop the background market feed. */
+export function stopPolymarketFeed(): void {
+  if (polyFeedTimer) {
+    clearInterval(polyFeedTimer);
+    polyFeedTimer = null;
+  }
+}

@@ -25,24 +25,63 @@ export class Board {
       canvas.width = 256;
       canvas.height = 256;
       const ctx = canvas.getContext('2d')!;
-      ctx.fillStyle = tile.color || '#ffffff';
-      ctx.fillRect(0, 0, 256, 256);
-      
-      // Add border
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 10;
-      ctx.strokeRect(0, 0, 256, 256);
 
-      // Add text
-      ctx.fillStyle = '#000000';
-      ctx.font = 'bold 40px Space Grotesk';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(tile.name, 128, 128);
-      
-      if (tile.price) {
-        ctx.font = 'bold 30px Space Grotesk';
-        ctx.fillText(`$${tile.price}`, 128, 180);
+      if (tile.type === 'prediction') {
+        // ── Prediction tile: purple gradient + Polymarket branding ──
+        const grad = ctx.createLinearGradient(0, 0, 256, 256);
+        grad.addColorStop(0, '#2e1065');
+        grad.addColorStop(1, '#4a1d96');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 256, 256);
+
+        // Border
+        ctx.strokeStyle = '#a855f7';
+        ctx.lineWidth = 12;
+        ctx.strokeRect(0, 0, 256, 256);
+
+        // Top label
+        ctx.fillStyle = '#d8b4fe';
+        ctx.font = 'bold 22px Space Grotesk';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText('POLYMARKET', 128, 18);
+
+        // Central dice emoji
+        ctx.font = '72px serif';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🎯', 128, 120);
+
+        // Topic
+        ctx.fillStyle = '#c084fc';
+        ctx.font = 'bold 20px Space Grotesk';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(tile.polymarketTopic?.toUpperCase() ?? 'BETS', 128, 238);
+
+        // YES/NO indicator strip
+        ctx.fillStyle = '#22c55e';
+        ctx.fillRect(0, 248, 128, 8);
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(128, 248, 128, 8);
+      } else {
+        ctx.fillStyle = tile.color || '#ffffff';
+        ctx.fillRect(0, 0, 256, 256);
+
+        // Add border
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 10;
+        ctx.strokeRect(0, 0, 256, 256);
+
+        // Add text
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 40px Space Grotesk';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(tile.name, 128, 128);
+
+        if (tile.price) {
+          ctx.font = 'bold 30px Space Grotesk';
+          ctx.fillText(`$${tile.price}`, 128, 180);
+        }
       }
 
       const texture = new THREE.CanvasTexture(canvas);
@@ -89,7 +128,12 @@ export class Board {
 
   public update(tiles: BoardTile[]) {
     tiles.forEach((tile, i) => {
-      if (tile.ownerIndex !== undefined && tile.ownerIndex !== null) {
+      if (tile.type === 'prediction') {
+        // Prediction tiles glow purple
+        const material = this.tileMeshes[i].material as THREE.MeshStandardMaterial;
+        material.emissive.set('#7c3aed');
+        material.emissiveIntensity = 0.6;
+      } else if (tile.ownerIndex !== undefined && tile.ownerIndex !== null) {
         // Highlight owned properties with agent's color
         const material = this.tileMeshes[i].material as THREE.MeshStandardMaterial;
         const agent = AGENTS[tile.ownerIndex];

@@ -1,4 +1,36 @@
 
+export interface PolymarketMarket {
+  id:            string;
+  slug:          string;
+  question:      string;
+  active:        boolean;
+  closed:        boolean;
+  volume?:       string;
+  liquidity?:    string;
+  endDate?:      string;
+  outcomePrices?: string[];   // ["0.62", "0.38"] YES/NO
+  conditionId?:  string;
+  tokens?:       Array<{ token_id: string; outcome: string; price?: string }>;
+  tags?:         Array<{ label: string }>;
+}
+
+export interface PolymarketActiveBet {
+  id:           string;
+  agentIndex:   number;
+  marketId:     string;
+  question:     string;
+  side:         'YES' | 'NO';
+  amount:       number;      // USDC staked
+  price:        number;      // probability 0-1 at bet time
+  shares:       number;
+  potentialWin: number;
+  simulated:    boolean;
+  placedAt:     number;      // timestamp
+  resolved?:    boolean;
+  won?:         boolean;
+  payout?:      number;
+}
+
 export interface PerformanceStats {
   fps: number;
   drawCalls: number;
@@ -123,11 +155,13 @@ export interface SocialComment {
 export interface BoardTile {
   id: string;
   name: string;
-  type: 'property' | 'event' | 'start' | 'jail' | 'tax';
+  type: 'property' | 'event' | 'start' | 'jail' | 'tax' | 'prediction';
   price?: number;
   ownerIndex?: number | null;
   color?: string;
   category?: string;
+  // For prediction tiles — which topic market to surface
+  polymarketTopic?: string;
 }
 
 export interface CharacterState {
@@ -157,6 +191,10 @@ export interface CharacterState {
 
   // ADK agent tracking (agents currently controlled by autonomous orchestrator)
   activeADKAgents: Set<number>;
+
+  // Polymarket live market data + active bets
+  polymarketData: PolymarketMarket[];
+  polymarketBets: PolymarketActiveBet[];
 
   // BankrBot Token Launches
   launchedTokens: {
@@ -230,6 +268,10 @@ export interface CharacterState {
   // ADK Agent Tracking
   markAgentAsADK: (agentIndex: number) => void;
   unmarkAgentAsADK: (agentIndex: number) => void;
+
+  // Polymarket Actions
+  setPolymarketData: (markets: PolymarketMarket[]) => void;
+  placePredictionBet: (agentIndex: number, marketId: string, question: string, side: 'YES' | 'NO', amount: number, price?: number) => void;
 
   // BankrBot Token Launch Tracking
   addLaunchedToken: (token: { tokenName: string; tokenSymbol: string; tokenAddress: string; chain: string; deployerAgentIndex: number; deployedAt: number }) => void;

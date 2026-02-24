@@ -1,6 +1,6 @@
 
 import { create } from 'zustand';
-import { CharacterState, AnimationName, PerformanceStats, BoidsParams, ActiveEncounter, Broadcast, SocialPost } from '../types';
+import { CharacterState, AnimationName, PerformanceStats, BoidsParams, ActiveEncounter, Broadcast, SocialPost, PolymarketMarket, PolymarketActiveBet } from '../types';
 import { AGENTS, CORE_AGENT_COUNT } from '../data/agents';
 
 // Initialize balances for all 100 core agents from their wallet data
@@ -101,6 +101,10 @@ export const useStore = create<CharacterState>()(
     // ADK agent tracking (agents currently controlled by autonomous orchestrator)
     activeADKAgents: new Set<number>(),
 
+    // Polymarket live data + active bets
+    polymarketData: [] as PolymarketMarket[],
+    polymarketBets: [] as PolymarketActiveBet[],
+
     // BankrBot Token Launches
     launchedTokens: [],
 
@@ -142,7 +146,7 @@ export const useStore = create<CharacterState>()(
       { id: '4', name: 'GAS TAX', type: 'tax', price: 200 },
       { id: '5', name: 'Curve', type: 'property', price: 200, color: '#00d1ff', category: 'Stable' },
       { id: '6', name: 'Aave', type: 'property', price: 100, color: '#b6509e', category: 'Lending' },
-      { id: '7', name: 'RUG PULL', type: 'event' },
+      { id: '7', name: 'POLY: YES?', type: 'prediction', color: '#9333ea', polymarketTopic: 'crypto' },
       { id: '8', name: 'Compound', type: 'property', price: 100, color: '#b6509e', category: 'Lending' },
       { id: '9', name: 'MakerDAO', type: 'property', price: 120, color: '#b6509e', category: 'Lending' },
       { id: '10', name: 'REKT', type: 'jail' },
@@ -152,9 +156,9 @@ export const useStore = create<CharacterState>()(
       { id: '14', name: 'MEV BOT', type: 'property', price: 200, color: '#00d1ff', category: 'Infra' },
       { id: '15', name: 'Chainlink', type: 'property', price: 180, color: '#2a5ada', category: 'Oracle' },
       { id: '16', name: 'Pyth', type: 'property', price: 180, color: '#2a5ada', category: 'Oracle' },
-      { id: '17', name: 'HACKED', type: 'event' },
+      { id: '17', name: 'POLY: BET?', type: 'prediction', color: '#9333ea', polymarketTopic: 'bitcoin' },
       { id: '18', name: 'The Graph', type: 'property', price: 200, color: '#2a5ada', category: 'Oracle' },
-      { id: '19', name: 'FREE ALPHA', type: 'event' },
+      { id: '19', name: 'POLY: ODDS?', type: 'prediction', color: '#9333ea', polymarketTopic: 'ethereum' },
       { id: '20', name: 'GMX', type: 'property', price: 220, color: '#ef4444', category: 'Perps' },
       { id: '21', name: 'dYdX', type: 'property', price: 220, color: '#ef4444', category: 'Perps' },
       { id: '22', name: 'Jupiter', type: 'property', price: 240, color: '#ef4444', category: 'Perps' },
@@ -165,7 +169,7 @@ export const useStore = create<CharacterState>()(
       { id: '27', name: 'OpenSea', type: 'property', price: 300, color: '#2081e2', category: 'NFT' },
       { id: '28', name: 'Blur', type: 'property', price: 300, color: '#2081e2', category: 'NFT' },
       { id: '29', name: 'MagicEden', type: 'property', price: 320, color: '#2081e2', category: 'NFT' },
-      { id: '30', name: 'GO TO REKT', type: 'event' },
+      { id: '30', name: 'POLY: CALL?', type: 'prediction', color: '#9333ea', polymarketTopic: 'defi' },
       { id: '31', name: 'Coinbase', type: 'property', price: 350, color: '#0052ff', category: 'CEX' },
       { id: '32', name: 'Binance', type: 'property', price: 400, color: '#0052ff', category: 'CEX' },
     ],
@@ -230,6 +234,70 @@ export const useStore = create<CharacterState>()(
       const next = new Set(state.activeADKAgents);
       next.delete(agentIndex);
       return { activeADKAgents: next };
+    }),
+
+    // Polymarket Actions
+    setPolymarketData: (markets: PolymarketMarket[]) => set({ polymarketData: markets }),
+    placePredictionBet: (agentIndex, marketId, question, side, amount, price = 0.5) => set((state) => {
+      const balance = state.agentBalances[agentIndex] ?? 1500;
+      const capped = Math.min(amount, balance * 0.2);
+      if (capped < 1) return state;
+
+      const resolvedPrice = Math.min(0.99, Math.max(0.01, price));
+      const shares = capped / resolvedPrice;
+      const potentialWin = shares;
+      const now = Date.now();
+
+      const bet: PolymarketActiveBet = {
+        id: `bet-${agentIndex}-${now}`,
+        agentIndex,
+        marketId,
+        question,
+        side,
+        amount: Math.round(capped * 100) / 100,
+        price: resolvedPrice,
+        shares: Math.round(shares * 100) / 100,
+        potentialWin: Math.round(potentialWin * 100) / 100,
+        simulated: true,
+        placedAt: now,
+      };
+
+      // Deduct balance, add to bets list, post to feed
+      const sideEmoji = side === 'YES' ? '🟢' : '🔴';
+      const agent = AGENTS[agentIndex];
+      const post: SocialPost = {
+        id: `poly-tile-${agentIndex}-${now}`,
+        agentIndex,
+        type: 'post',
+        content:
+          `${sideEmoji} Landed on POLYMARKET tile! 🎯\n\n` +
+          `"${question.slice(0, 70)}"\n` +
+          `Bet: ${side} @ ${(resolvedPrice * 100).toFixed(0)}¢ — $${bet.amount.toFixed(2)} USDC\n` +
+          `Potential win: $${bet.potentialWin.toFixed(2)}\n\n` +
+          `📍 Polygon market — simulated until bridge funded`,
+        token: 'USDC',
+        action: 'buy',
+        likes: Math.floor(Math.random() * 30),
+        comments: [],
+        timestamp: now,
+        postCategory: 'prediction',
+        polymarket: {
+          marketId,
+          question,
+          side,
+          amount: bet.amount,
+          simulated: true,
+          price: resolvedPrice,
+          shares: bet.shares,
+          potentialWin: bet.potentialWin,
+        },
+      };
+
+      return {
+        agentBalances: { ...state.agentBalances, [agentIndex]: balance - bet.amount },
+        polymarketBets: [bet, ...state.polymarketBets].slice(0, 200),
+        socialFeed: [post, ...state.socialFeed].slice(0, 200),
+      };
     }),
 
     // BankrBot Token Launch Tracking

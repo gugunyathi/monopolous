@@ -12,6 +12,8 @@ import { startBroadcastScheduler, stopBroadcastScheduler } from './services/broa
 import { startPostScheduler, stopPostScheduler } from './services/postGeneratorService';
 import { startWalletSimulator, stopWalletSimulator } from './services/walletSimulatorService';
 import { startADKOrchestrator, stopADKOrchestrator } from './services/adk/orchestrator';
+import { startPolymarketFeed, stopPolymarketFeed } from './services/polymarketService';
+import { useStore } from './store/useStore';
 
 const App: React.FC = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -29,6 +31,7 @@ const App: React.FC = () => {
     startPostScheduler();
     startWalletSimulator();
     startADKOrchestrator();
+    startPolymarketFeed((markets) => useStore.getState().setPolymarketData(markets));
 
     return () => {
       if (managerRef.current) {
@@ -39,6 +42,7 @@ const App: React.FC = () => {
       stopPostScheduler();
       stopWalletSimulator();
       stopADKOrchestrator();
+      stopPolymarketFeed();
     };
   }, []);
 
