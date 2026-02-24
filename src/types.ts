@@ -144,6 +144,33 @@ export interface CharacterState {
   // ADK agent tracking (agents currently controlled by autonomous orchestrator)
   activeADKAgents: Set<number>;
 
+  // BankrBot Token Launches
+  launchedTokens: {
+    tokenName: string;
+    tokenSymbol: string;
+    tokenAddress: string;
+    chain: string;
+    deployerAgentIndex: number;
+    deployedAt: number;
+  }[];
+
+  // BNKR Wallet State
+  bnkrMasterAddress: string;
+  bnkrConnectionStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
+  bnkrWallets: {
+    agentIndex: number;
+    walletId: string;
+    masterAddress: string;
+    status: string;
+    label: string;
+    allocatedBalance: number;
+    totalSpent: number;
+    totalEarned: number;
+    capabilities: string[];
+    createdAt: number;
+    lastActiveAt: number;
+  }[];
+
   // Auth
   userAddress: string | null;
   setUserAddress: (address: string | null) => void;
@@ -189,6 +216,15 @@ export interface CharacterState {
   // ADK Agent Tracking
   markAgentAsADK: (agentIndex: number) => void;
   unmarkAgentAsADK: (agentIndex: number) => void;
+
+  // BankrBot Token Launch Tracking
+  addLaunchedToken: (token: { tokenName: string; tokenSymbol: string; tokenAddress: string; chain: string; deployerAgentIndex: number; deployedAt: number }) => void;
+
+  // BNKR Wallet Actions
+  setBnkrMasterAddress: (address: string) => void;
+  setBnkrConnectionStatus: (status: 'disconnected' | 'connecting' | 'connected' | 'error') => void;
+  setBnkrWallets: (wallets: CharacterState['bnkrWallets']) => void;
+  updateBnkrWallet: (agentIndex: number, updates: Partial<CharacterState['bnkrWallets'][0]>) => void;
 
   // Game Actions
   buyProperty: (agentIndex: number, tileId: string) => void;

@@ -14,6 +14,8 @@ import SocialFeed from './SocialFeed';
 import PostsFeed from './PostsFeed';
 import Leaderboard from './Leaderboard';
 import CameraControls from './CameraControls';
+import TokenLaunchesPanel from './TokenLaunchesPanel';
+import { BnkrWalletPanel } from './BnkrWalletPanel';
 
 const UIOverlay: React.FC = () => {
   const { 
@@ -67,6 +69,18 @@ const UIOverlay: React.FC = () => {
       <PostsFeed />
       <Leaderboard />
       <CameraControls />
+
+      {/* Token Launches Panel — shows in social/posts mode */}
+      {(viewMode === 'social' || viewMode === 'posts') && (
+        <div className="fixed top-16 sm:top-20 right-3 sm:right-4 md:right-6 w-72 md:w-80 z-[105] pointer-events-auto">
+          <TokenLaunchesPanel />
+        </div>
+      )}
+
+      {/* BNKR Wallet Panel — shows in social/posts/world modes */}
+      {(viewMode === 'social' || viewMode === 'posts' || viewMode === 'world') && (
+        <BnkrWalletPanel />
+      )}
 
       {/* Live Notification Toast */}
       <AnimatePresence>

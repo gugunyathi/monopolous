@@ -101,6 +101,14 @@ export const useStore = create<CharacterState>()(
     // ADK agent tracking (agents currently controlled by autonomous orchestrator)
     activeADKAgents: new Set<number>(),
 
+    // BankrBot Token Launches
+    launchedTokens: [],
+
+    // BNKR Wallet State
+    bnkrMasterAddress: '',
+    bnkrConnectionStatus: 'disconnected' as const,
+    bnkrWallets: [],
+
     // Auth
     userAddress: null,
 
@@ -223,6 +231,35 @@ export const useStore = create<CharacterState>()(
       next.delete(agentIndex);
       return { activeADKAgents: next };
     }),
+
+    // BankrBot Token Launch Tracking
+    addLaunchedToken: (token) => set((state) => ({
+      launchedTokens: [token, ...state.launchedTokens].slice(0, 50),
+    })),
+
+    // BNKR Wallet Actions
+    setBnkrMasterAddress: (address) => set({ bnkrMasterAddress: address }),
+    setBnkrConnectionStatus: (status) => set({ bnkrConnectionStatus: status }),
+    setBnkrWallets: (wallets) => set({
+      bnkrWallets: wallets.map((w) => ({
+        agentIndex: w.agentIndex,
+        walletId: w.walletId,
+        masterAddress: w.masterAddress,
+        status: w.status,
+        label: w.label,
+        allocatedBalance: w.allocatedBalance,
+        totalSpent: w.totalSpent,
+        totalEarned: w.totalEarned,
+        capabilities: w.capabilities,
+        createdAt: w.createdAt,
+        lastActiveAt: w.lastActiveAt,
+      })),
+    }),
+    updateBnkrWallet: (agentIndex, updates) => set((state) => ({
+      bnkrWallets: state.bnkrWallets.map((w) =>
+        w.agentIndex === agentIndex ? { ...w, ...updates } : w,
+      ),
+    })),
 
     // Game Actions
     buyProperty: (agentIndex, tileId) => set((state) => {

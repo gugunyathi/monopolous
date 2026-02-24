@@ -16,7 +16,17 @@
 import { GoogleGenAI } from '@google/genai';
 import { AGENTS, CORE_AGENT_COUNT } from '../../data/agents';
 import { useStore } from '../../store/useStore';
-import { WALLET_TOOL_DECLARATIONS, executeTool } from './tools';
+import { WALLET_TOOL_DECLARATIONS, BANKR_TOOL_DECLARATIONS, BNKR_WALLET_TOOL_DECLARATIONS, executeTool, executeBankrTool, executeBnkrWalletTool } from './tools';
+import { isBankrBotAvailable } from '../bankrBotService';
+import { getLaunchedTokens } from '../tokenLaunchService';
+import {
+  provisionAllWallets,
+  isProvisioned,
+  getAgentBnkrWallet,
+  getWalletStats,
+  formatCapabilities,
+  type BnkrWalletCapability,
+} from '../bnkrWalletService';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -81,6 +91,18 @@ function buildSystemPrompt(agentIndex: number): string {
     })
     .join('\n');
 
+  // BankrBot context — launched tokens
+  const bankrAvailable = isBankrBotAvailable();
+  const launchedTokens = getLaunchedTokens();
+  const tokenList = launchedTokens.slice(0, 5).map(
+    (t) => `• $${t.tokenSymbol} (${t.tokenName}) — deployed by Agent #${t.deployerAgentIndex}`,
+  ).join('\n');
+
+  // BNKR Wallet context
+  const bnkrWallet = getAgentBnkrWallet(agentIndex);
+  const bnkrProvisioned = isProvisioned();
+  const walletStats = bnkrProvisioned ? getWalletStats() : null;
+
   return `You are @${agent.role.replace(/\s+/g, '').toLowerCase()}, ${agent.role} in ${agent.department} at FakeClaw Inc.
 
 PERSONALITY: ${agent.personality}
@@ -91,16 +113,47 @@ TOKENS: ${agent.preferredTokens.join(', ')}
 WALLET:
 • Balance: $${balance.toFixed(2)} USDC on Base
 • Skills: ${agent.wallet.skills.join(', ')}
+${bnkrWallet ? `
+BNKR WALLET (ON-CHAIN):
+• Status: ${bnkrWallet.status === 'connected' ? '🟢 Connected' : '🔴 Disconnected'}
+• Wallet ID: ${bnkrWallet.walletId}
+• Master Address: ${bnkrWallet.masterAddress.slice(0, 10)}…${bnkrWallet.masterAddress.slice(-4)}
+• Allocation: $${bnkrWallet.allocatedBalance.toFixed(2)}
+• Capabilities: ${formatCapabilities(bnkrWallet.capabilities as BnkrWalletCapability[])}
+${walletStats ? `• Treasury: ${walletStats.connectedWallets}/${walletStats.totalWallets} agents connected, $${walletStats.totalAllocated.toFixed(0)} total allocated` : ''}
+BNKR GUIDELINES:
+- You have a real on-chain BNKR wallet identity connected to the company treasury
+- Use bnkr_check_wallet to show your wallet status (~10% chance)
+- Use bnkr_sign_message to create verifiable on-chain attestations
+- Use bnkr_check_portfolio to review treasury and department allocations
+` : ''}
 ${headlines ? `\nMARKET NEWS:\n${headlines}` : ''}
 ${chatter ? `\nSOCIAL CHATTER:\n${chatter}` : ''}
+${bankrAvailable ? `\nBANKRBOT INTEGRATION (REAL ON-CHAIN):
+You have access to BankrBot tools that execute REAL transactions on Base:
+• bankr_deploy_token — Launch a new token with Uniswap V4 pool (use sparingly!)
+• bankr_swap — Execute real token swaps on Base
+• bankr_dca — Set up dollar-cost averaging orders
+• bankr_limit_order — Place limit buys, limit sells, or stop-losses
+• bankr_check_price — Get real token prices
+• bankr_claim_fees — Claim creator fees from deployed tokens
 
+${tokenList ? `RECENTLY LAUNCHED TOKENS:\n${tokenList}\n` : ''}
+BANKR GUIDELINES:
+- Deploy tokens RARELY (only when you have a creative idea, ~5% chance)
+- Swaps must be at least $1
+- DCA minimum $20 per execution
+- Only agent 0 (CEO) should claim fees
+- Be creative with token names — relate to your department/role
+` : ''}
 RULES:
 1. Pick ONE action. Use a tool to execute it.
 2. Stay in character — degens ape, conservatives DCA, contrarians fade.
 3. Never trade more than 40% of your balance.
 4. Keep post_update content ≤ 280 chars. Include emojis.
 5. React to market news and chatter when relevant.
-6. If balance < $20, prefer posting opinions over trading.`;
+6. If balance < $20, prefer posting opinions over trading.
+${bankrAvailable ? '7. Occasionally use BankrBot tools for real on-chain activity — prefer bankr_swap for real trades and bankr_deploy_token for creative token launches.' : ''}`;
 }
 
 // ─── Process a Single Agent ──────────────────────────────────────────────────
@@ -119,6 +172,13 @@ async function processAgent(agentIndex: number): Promise<boolean> {
     return true; // not an error, just skip
   }
 
+  // Combine wallet tools + BankrBot tools + BNKR wallet tools when available
+  const allTools = [
+    ...WALLET_TOOL_DECLARATIONS,
+    ...(isBankrBotAvailable() ? BANKR_TOOL_DECLARATIONS : []),
+    ...(isProvisioned() ? BNKR_WALLET_TOOL_DECLARATIONS : []),
+  ];
+
   try {
     const response = await ai.models.generateContent({
       model: MODEL,
@@ -134,7 +194,7 @@ async function processAgent(agentIndex: number): Promise<boolean> {
       ],
       config: {
         systemInstruction: buildSystemPrompt(agentIndex),
-        tools: [{ functionDeclarations: WALLET_TOOL_DECLARATIONS as any }],
+        tools: [{ functionDeclarations: allTools as any }],
         temperature: 0.95,
         topP: 0.95,
         maxOutputTokens: 350,
@@ -148,10 +208,52 @@ async function processAgent(agentIndex: number): Promise<boolean> {
       console.log(
         `[ADK] 🧠 #${agentIndex} ${agent.role} → ${fc.name}(${JSON.stringify(fc.args)})`,
       );
-      const post = executeTool(agentIndex, fc.name, fc.args ?? {});
-      if (post) {
-        store.addPost(post);
-        console.log(`[ADK] ✅ ${post.content.slice(0, 80)}…`);
+
+      // Check if this is a BankrBot tool (async execution)
+      const isBankrTool = fc.name.startsWith('bankr_');
+      const isBnkrWalletTool = fc.name.startsWith('bnkr_');
+
+      if (isBankrTool) {
+        // Post a placeholder immediately
+        const placeholder = executeTool(agentIndex, fc.name, fc.args ?? {});
+        if (placeholder) {
+          store.addPost(placeholder);
+          console.log(`[ADK] ⏳ BankrBot async: ${fc.name}`);
+        }
+
+        // Execute the real BankrBot call asynchronously (don't block the cycle)
+        executeBankrTool(agentIndex, fc.name, fc.args ?? {}).then((resultPost) => {
+          if (resultPost) {
+            store.addPost(resultPost);
+            console.log(`[ADK] ✅ BankrBot complete: ${resultPost.content.slice(0, 80)}…`);
+          }
+        }).catch((err) => {
+          console.error(`[ADK] ❌ BankrBot ${fc.name} failed:`, err);
+        });
+      } else if (isBnkrWalletTool) {
+        // BNKR wallet tools — synchronous placeholder, async execution
+        const placeholder = executeTool(agentIndex, fc.name, fc.args ?? {});
+        if (placeholder) {
+          store.addPost(placeholder);
+          console.log(`[ADK] ⏳ BNKR wallet: ${fc.name}`);
+        }
+
+        // Execute BNKR wallet tool asynchronously
+        executeBnkrWalletTool(agentIndex, fc.name, fc.args ?? {}).then((resultPost) => {
+          if (resultPost) {
+            store.addPost(resultPost);
+            console.log(`[ADK] ✅ BNKR wallet complete: ${resultPost.content.slice(0, 80)}…`);
+          }
+        }).catch((err) => {
+          console.error(`[ADK] ❌ BNKR ${fc.name} failed:`, err);
+        });
+      } else {
+        // Standard tool — synchronous execution
+        const post = executeTool(agentIndex, fc.name, fc.args ?? {});
+        if (post) {
+          store.addPost(post);
+          console.log(`[ADK] ✅ ${post.content.slice(0, 80)}…`);
+        }
       }
     } else {
       // Text-only — post as social update
@@ -269,6 +371,21 @@ export function startADKOrchestrator(): void {
   ai = new GoogleGenAI({ apiKey });
   running = true;
   consecutiveErrors = 0;
+
+  // Provision BNKR wallets on startup (async, non-blocking)
+  if (isBankrBotAvailable()) {
+    provisionAllWallets()
+      .then((ok) => {
+        if (ok) {
+          const stats = getWalletStats();
+          console.log(
+            `[ADK] 🏦 BNKR wallets ready: ${stats.connectedWallets} connected, ` +
+              `$${stats.totalAllocated.toFixed(0)} total allocated`,
+          );
+        }
+      })
+      .catch((err) => console.error('[ADK] BNKR provisioning error:', err));
+  }
 
   // Warm-up delay so the simulation has content for context
   cycleTimer = setTimeout(runCycle, WARM_UP_MS);
