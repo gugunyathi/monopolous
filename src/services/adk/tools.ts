@@ -16,6 +16,14 @@ import { SocialPost, PostCategory } from '../../types';
 import { AGENTS, CORE_AGENT_COUNT } from '../../data/agents';
 import { useStore } from '../../store/useStore';
 import {
+  POLYMARKET_SIMULATED,
+  searchMarkets,
+  placeBet,
+  formatMarketForPost,
+  getYesTokenId,
+  type PolyMarket,
+} from '../polymarketService';
+import {
   isBankrBotAvailable,
   executePrompt as bankrExecutePrompt,
 } from '../bankrBotService';
@@ -333,6 +341,70 @@ export const BANKR_TOOL_DECLARATIONS = [
   },
 ];
 
+// ─── Polymarket Tool Declarations ───────────────────────────────────────────
+
+export const POLYMARKET_TOOL_DECLARATIONS = [
+  {
+    name: 'search_polymarket_markets',
+    description:
+      'Search Polymarket prediction markets for events to bet on. Returns active markets with current YES/NO prices and volume. No wallet needed.',
+    parameters: {
+      type: 'OBJECT' as const,
+      properties: {
+        query: {
+          type: 'STRING' as const,
+          description: 'Search query — topic or event to look for (e.g. "bitcoin", "election", "fed rate", "crypto")',
+        },
+        limit: {
+          type: 'NUMBER' as const,
+          description: 'Number of markets to return (1-5, default 3)',
+        },
+        reasoning: {
+          type: 'STRING' as const,
+          description: 'Why you are researching these prediction markets (include emoji)',
+        },
+      },
+      required: ['query', 'reasoning'],
+    },
+  },
+  {
+    name: 'place_polymarket_bet',
+    description:
+      'Place a prediction market bet on Polymarket. Buy YES or NO shares on an active market. Costs USDC from your balance. Currently simulated — no real Polygon transactions until bridge funding is set up.',
+    parameters: {
+      type: 'OBJECT' as const,
+      properties: {
+        market_id: {
+          type: 'STRING' as const,
+          description: 'Polymarket market ID (from search_polymarket_markets results)',
+        },
+        market_question: {
+          type: 'STRING' as const,
+          description: 'The market question text (for the social post)',
+        },
+        token_id: {
+          type: 'STRING' as const,
+          description: 'YES token ID from the market (from search results)',
+        },
+        side: {
+          type: 'STRING' as const,
+          description: 'YES to bet it happens, NO to bet it does not',
+          enum: ['YES', 'NO'],
+        },
+        amount: {
+          type: 'NUMBER' as const,
+          description: 'Amount in USDC to bet (min $1, max 20% of balance)',
+        },
+        reasoning: {
+          type: 'STRING' as const,
+          description: 'Why you are taking this position — your prediction thesis (include emoji)',
+        },
+      },
+      required: ['market_id', 'market_question', 'side', 'amount', 'reasoning'],
+    },
+  },
+];
+
 // ─── BNKR Wallet Tool Declarations ──────────────────────────────────────────
 
 export const BNKR_WALLET_TOOL_DECLARATIONS = [
@@ -531,6 +603,62 @@ export function executeTool(
         timestamp: now,
         postCategory: (category || 'general') as PostCategory,
         isADK: true,
+      };
+    }
+
+    // ── Polymarket — placeholder (async execution follows) ─────────────────
+    case 'search_polymarket_markets': {
+      const { query, reasoning } = args;
+      return {
+        id: postId,
+        agentIndex,
+        type: 'post',
+        content: `🔍 Scanning Polymarket for "${query || 'predictions'}}"…\n\n💭 ${reasoning || 'Researching prediction markets'}`,
+        token: '',
+        action: 'search' as const,
+        likes: Math.floor(Math.random() * 10),
+        comments: [],
+        timestamp: now,
+        postCategory: 'prediction',
+        isADK: true,
+      };
+    }
+
+    case 'place_polymarket_bet': {
+      const { market_question, side, amount: betAmt, reasoning: betReason } = args;
+      const cappedBet = Math.round(Math.min(Math.abs(betAmt || 5), balance * 0.2) * 100) / 100;
+      if (cappedBet < 1) return null;
+
+      // Deduct from balance immediately (simulated)
+      store.updateBalance(agentIndex, -cappedBet);
+      const newBal = store.agentBalances[agentIndex] ?? balance;
+
+      const sideEmoji = side === 'YES' ? '🟢' : '🔴';
+      const simLabel = POLYMARKET_SIMULATED ? ' [SIM]' : '';
+      return {
+        id: postId,
+        agentIndex,
+        type: 'post',
+        content:
+          `${sideEmoji} Polymarket Bet${simLabel}\n\n` +
+          `"${(market_question || '???').slice(0, 80)}"\n` +
+          `Position: ${side} | $${cappedBet.toFixed(2)} USDC\n\n` +
+          `💭 ${betReason || ''}\n` +
+          `💰 Balance: $${newBal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`,
+        token: 'USDC',
+        action: 'buy' as const,
+        likes: Math.floor(Math.random() * 30),
+        comments: [],
+        timestamp: now,
+        postCategory: 'prediction',
+        isADK: true,
+        polymarket: {
+          marketId:  args.market_id || '',
+          question:  market_question || '',
+          side:      side as 'YES' | 'NO',
+          amount:    cappedBet,
+          simulated: POLYMARKET_SIMULATED,
+        },
       };
     }
 
@@ -1053,6 +1181,165 @@ export async function executeBnkrWalletTool(
       type: 'post',
       content: `❌ BNKR wallet action failed: ${toolName.replace('bnkr_', '')}\n\n${err.message?.slice(0, 100) || 'Unknown error'}`,
       token: 'BNKR',
+      action: undefined,
+      likes: 0,
+      comments: [],
+      timestamp: now,
+      postCategory: 'general',
+      isADK: true,
+    };
+  }
+}
+
+// ─── Async Polymarket Tool Execution ──────────────────────────────────────────
+
+/**
+ * Execute a Polymarket tool asynchronously.
+ * Called after executeTool() posts the placeholder.
+ * For search: fetches real market data and posts results.
+ * For bet: posts the enriched result after resolving live price.
+ */
+export async function executePolymarketTool(
+  agentIndex: number,
+  toolName: string,
+  args: Record<string, any>,
+): Promise<SocialPost | null> {
+  const agent = AGENTS[agentIndex];
+  if (!agent) return null;
+
+  const now = Date.now();
+  const postId = `poly-${agentIndex}-${now}-${Math.random().toString(36).slice(2, 6)}`;
+
+  try {
+    switch (toolName) {
+
+      // ── Market Search ────────────────────────────────────────
+      case 'search_polymarket_markets': {
+        const { query, reasoning, limit } = args;
+        const markets = await searchMarkets(query || 'crypto', Math.min(limit ?? 3, 5));
+
+        if (markets.length === 0) {
+          return {
+            id: postId,
+            agentIndex,
+            type: 'post',
+            content: `🔍 No active Polymarket markets found for "${query}".\n\nWill check back later 🔄`,
+            token: '',
+            action: undefined,
+            likes: 0,
+            comments: [],
+            timestamp: now,
+            postCategory: 'prediction',
+            isADK: true,
+          };
+        }
+
+        const marketLines = markets
+          .map((m, i) => `${i + 1}. ${formatMarketForPost(m)}`)
+          .join('\n\n');
+
+        // Surface the first matching market for potential follow-up bet
+        const topMarket = markets[0];
+        const yesTokenId = getYesTokenId(topMarket);
+        const yesPrice = topMarket.outcomePrices?.[0]
+          ? `${(parseFloat(topMarket.outcomePrices[0]) * 100).toFixed(0)}¢`
+          : '??¢';
+
+        return {
+          id: postId,
+          agentIndex,
+          type: 'post',
+          content:
+            `🎯 Polymarket Research\n\n` +
+            `${marketLines.slice(0, 280)}\n\n` +
+            `💡 ${(reasoning || '').slice(0, 100)}`,
+          token: '',
+          action: 'search' as const,
+          likes: Math.floor(Math.random() * 25) + 5,
+          comments: [],
+          timestamp: now,
+          postCategory: 'prediction',
+          isADK: true,
+          polymarket: yesTokenId ? {
+            marketId:  topMarket.id,
+            question:  topMarket.question,
+            side:      'YES' as const,
+            amount:    0,
+            simulated: true,
+            yesPrice,
+            tokenId:   yesTokenId,
+          } : undefined,
+        };
+      }
+
+      // ── Bet Placement (enriched result) ───────────────────────
+      case 'place_polymarket_bet': {
+        const { market_id, market_question, token_id, side, amount: betAmt, reasoning: betReason } = args;
+        const store = useStore.getState();
+        const balance = store.agentBalances[agentIndex] ?? agent.wallet.balance;
+        const cappedBet = Math.round(Math.min(Math.abs(betAmt || 5), balance * 0.2) * 100) / 100;
+
+        // Build a minimal market object for placeBet
+        const marketObj: PolyMarket = {
+          id:       market_id || '',
+          slug:     '',
+          question: market_question || 'Unknown market',
+          active:   true,
+          closed:   false,
+        };
+
+        const result = await placeBet(
+          null, // no private key — simulated
+          token_id || '',
+          marketObj,
+          side as 'YES' | 'NO',
+          cappedBet,
+        );
+
+        const sideEmoji = result.side === 'YES' ? '🟢' : '🔴';
+        const simLabel  = result.simulated ? ' [SIM — Polygon bridge pending]' : '';
+
+        return {
+          id: postId,
+          agentIndex,
+          type: 'post',
+          content:
+            `${sideEmoji} POLYMARKET BET${simLabel}\n\n` +
+            `"${result.question.slice(0, 70)}"\n` +
+            `${result.side} @ ${(result.price * 100).toFixed(1)}¢\n` +
+            `Staked: $${result.amount.toFixed(2)} | Potential win: $${result.potentialWin.toFixed(2)}\n\n` +
+            `💭 ${(betReason || '').slice(0, 120)}`,
+          token: 'USDC',
+          action: 'buy' as const,
+          likes: Math.floor(Math.random() * 40) + 5,
+          comments: [],
+          timestamp: now,
+          postCategory: 'prediction',
+          isADK: true,
+          polymarket: {
+            marketId:    result.marketId,
+            question:    result.question,
+            side:        result.side,
+            amount:      result.amount,
+            simulated:   result.simulated,
+            price:       result.price,
+            shares:      result.shares,
+            potentialWin: result.potentialWin,
+          },
+        };
+      }
+
+      default:
+        return null;
+    }
+  } catch (err: any) {
+    console.error(`[ADK/Polymarket] ❌ ${toolName} failed:`, err.message);
+    return {
+      id: postId,
+      agentIndex,
+      type: 'post',
+      content: `❌ Polymarket action failed: ${toolName.replace('polymarket_', '')}\n\n${err.message?.slice(0, 100) || 'Unknown error'}`,
+      token: '',
       action: undefined,
       likes: 0,
       comments: [],

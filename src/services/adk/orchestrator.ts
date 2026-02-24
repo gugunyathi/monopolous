@@ -16,7 +16,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { AGENTS, CORE_AGENT_COUNT } from '../../data/agents';
 import { useStore } from '../../store/useStore';
-import { WALLET_TOOL_DECLARATIONS, BANKR_TOOL_DECLARATIONS, BNKR_WALLET_TOOL_DECLARATIONS, executeTool, executeBankrTool, executeBnkrWalletTool } from './tools';
+import { WALLET_TOOL_DECLARATIONS, BANKR_TOOL_DECLARATIONS, BNKR_WALLET_TOOL_DECLARATIONS, POLYMARKET_TOOL_DECLARATIONS, executeTool, executeBankrTool, executeBnkrWalletTool, executePolymarketTool } from './tools';
 import { isBankrBotAvailable } from '../bankrBotService';
 import { getLaunchedTokens } from '../tokenLaunchService';
 import {
@@ -146,6 +146,16 @@ BANKR GUIDELINES:
 - Only agent 0 (CEO) should claim fees
 - Be creative with token names — relate to your department/role
 ` : ''}
+POLYMARKET PREDICTION MARKETS:
+You have access to real Polymarket prediction markets as an investment tool:
+• search_polymarket_markets — Browse active markets by topic (crypto, politics, sports, macro)
+• place_polymarket_bet — Take a YES or NO position (costs USDC, currently simulated)
+
+POLYMARKET GUIDELINES:
+- Search markets when you want to research a prediction (~10% chance per cycle)
+- Bet on YES/NO positions that align with your trading thesis and tokens
+- Max 20% of balance per bet — treat like high-risk options
+- Preferred topics based on your tokens: ${agent.preferredTokens.slice(0,3).join(', ')}
 RULES:
 1. Pick ONE action. Use a tool to execute it.
 2. Stay in character — degens ape, conservatives DCA, contrarians fade.
@@ -153,7 +163,8 @@ RULES:
 4. Keep post_update content ≤ 280 chars. Include emojis.
 5. React to market news and chatter when relevant.
 6. If balance < $20, prefer posting opinions over trading.
-${bankrAvailable ? '7. Occasionally use BankrBot tools for real on-chain activity — prefer bankr_swap for real trades and bankr_deploy_token for creative token launches.' : ''}`;
+7. POLYMARKET: Use search_polymarket_markets to research prediction markets (~10% chance). Use place_polymarket_bet to take a YES/NO position (max 20% of balance). Prefer markets related to your tokens or department.
+${bankrAvailable ? '8. Occasionally use BankrBot tools for real on-chain activity — prefer bankr_swap for real trades and bankr_deploy_token for creative token launches.' : ''}`;
 }
 
 // ─── Process a Single Agent ──────────────────────────────────────────────────
@@ -172,9 +183,10 @@ async function processAgent(agentIndex: number): Promise<boolean> {
     return true; // not an error, just skip
   }
 
-  // Combine wallet tools + BankrBot tools + BNKR wallet tools when available
+  // Combine wallet tools + BankrBot + BNKR wallet + Polymarket tools
   const allTools = [
     ...WALLET_TOOL_DECLARATIONS,
+    ...POLYMARKET_TOOL_DECLARATIONS,
     ...(isBankrBotAvailable() ? BANKR_TOOL_DECLARATIONS : []),
     ...(isProvisioned() ? BNKR_WALLET_TOOL_DECLARATIONS : []),
   ];
@@ -212,6 +224,7 @@ async function processAgent(agentIndex: number): Promise<boolean> {
       // Check if this is a BankrBot tool (async execution)
       const isBankrTool = fc.name.startsWith('bankr_');
       const isBnkrWalletTool = fc.name.startsWith('bnkr_');
+      const isPolymarketTool = fc.name === 'search_polymarket_markets' || fc.name === 'place_polymarket_bet';
 
       if (isBankrTool) {
         // Post a placeholder immediately
@@ -246,6 +259,22 @@ async function processAgent(agentIndex: number): Promise<boolean> {
           }
         }).catch((err) => {
           console.error(`[ADK] ❌ BNKR ${fc.name} failed:`, err);
+        });
+      } else if (isPolymarketTool) {
+        // Polymarket tools — placeholder immediately, async fetch enriches the result
+        const placeholder = executeTool(agentIndex, fc.name, fc.args ?? {});
+        if (placeholder) {
+          store.addPost(placeholder);
+          console.log(`[ADK] ⏳ Polymarket async: ${fc.name}`);
+        }
+
+        executePolymarketTool(agentIndex, fc.name, fc.args ?? {}).then((resultPost) => {
+          if (resultPost) {
+            store.addPost(resultPost);
+            console.log(`[ADK] 🎯 Polymarket complete: ${resultPost.content.slice(0, 80)}…`);
+          }
+        }).catch((err) => {
+          console.error(`[ADK] ❌ Polymarket ${fc.name} failed:`, err);
         });
       } else {
         // Standard tool — synchronous execution
