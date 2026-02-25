@@ -274,41 +274,22 @@ export class CharacterManager {
     // ── CEO body label ────────────────────────────────────────
     const ceoCanvas = document.createElement('canvas');
     ceoCanvas.width = 256;
-    ceoCanvas.height = 96;
+    ceoCanvas.height = 128;
     const cctx = ceoCanvas.getContext('2d');
     if (cctx) {
-      // Rounded pill background
-      const rw = 256, rh = 96, r = 48;
-      cctx.clearRect(0, 0, rw, rh);
-      cctx.beginPath();
-      cctx.moveTo(r, 0);
-      cctx.lineTo(rw - r, 0);
-      cctx.quadraticCurveTo(rw, 0, rw, r);
-      cctx.lineTo(rw, rh - r);
-      cctx.quadraticCurveTo(rw, rh, rw - r, rh);
-      cctx.lineTo(r, rh);
-      cctx.quadraticCurveTo(0, rh, 0, rh - r);
-      cctx.lineTo(0, r);
-      cctx.quadraticCurveTo(0, 0, r, 0);
-      cctx.closePath();
-      // Gold gradient fill
-      const grad = cctx.createLinearGradient(0, 0, 0, rh);
-      grad.addColorStop(0, '#f59e0b');
-      grad.addColorStop(1, '#b45309');
-      cctx.fillStyle = grad;
-      cctx.fill();
-      // White stroke
-      cctx.strokeStyle = 'rgba(255,255,255,0.6)';
-      cctx.lineWidth = 4;
-      cctx.stroke();
-      // CEO text
-      cctx.font = 'black 52px Arial';
-      cctx.fillStyle = '#ffffff';
+      cctx.clearRect(0, 0, 256, 128);
+      // Bold white text with a thin dark outline for readability
+      cctx.font = '900 96px Arial';
       cctx.textAlign = 'center';
       cctx.textBaseline = 'middle';
-      cctx.shadowColor = 'rgba(0,0,0,0.5)';
-      cctx.shadowBlur = 6;
-      cctx.fillText('C E O', rw / 2, rh / 2);
+      // Dark outline
+      cctx.strokeStyle = 'rgba(0,0,0,0.85)';
+      cctx.lineWidth = 10;
+      cctx.lineJoin = 'round';
+      cctx.strokeText('CEO', 128, 64);
+      // White fill
+      cctx.fillStyle = '#ffffff';
+      cctx.fillText('CEO', 128, 64);
     }
     const ceoTex = new THREE.CanvasTexture(ceoCanvas);
     ceoTex.needsUpdate = true;
@@ -319,7 +300,7 @@ export class CharacterManager {
       sizeAttenuation: true,
     });
     this.ceoLabelSprite = new THREE.Sprite(ceoMat);
-    this.ceoLabelSprite.scale.set(0.9, 0.34, 1);
+    this.ceoLabelSprite.scale.set(1.2, 0.6, 1);
     this.ceoLabelSprite.renderOrder = 999;
     this.scene.add(this.ceoLabelSprite);
   }
