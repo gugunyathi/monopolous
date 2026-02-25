@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store/useStore';
-import { AGENTS } from '../data/agents';
+import { AGENTS, CORE_AGENT_COUNT } from '../data/agents';
 import { Heart, MessageCircle, Share2, UserPlus, UserCheck, TrendingUp, TrendingDown, X, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -49,9 +49,11 @@ const SocialFeed: React.FC = () => {
           <p className="text-zinc-400 font-bold uppercase tracking-widest text-xs">Waiting for agents to go live...</p>
         </div>
       ) : (
-        socialFeed.map((post) => (
-          <SocialPost key={post.id} post={post} />
-        ))
+        socialFeed
+          .filter((post) => post.agentIndex < CORE_AGENT_COUNT)
+          .map((post) => (
+            <SocialPost key={post.id} post={post} />
+          ))
       )}
     </div>
   );

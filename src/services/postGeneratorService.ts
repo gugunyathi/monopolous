@@ -7,7 +7,7 @@
  */
 
 import { SocialPost, PostCategory } from '../types';
-import { AGENTS, TOTAL_COUNT } from '../data/agents';
+import { AGENTS, CORE_AGENT_COUNT } from '../data/agents';
 import { useStore } from '../store/useStore';
 
 // ─── Post Templates by Category ──────────────────────────────────────────────
@@ -327,7 +327,7 @@ function pickCategory(agent: typeof AGENTS[0]): PostCategory {
 // ─── Main Post Generator ────────────────────────────────────────────────────
 
 export function generateAgentPost(agentIndex?: number): SocialPost {
-  const idx = agentIndex ?? (1 + Math.floor(Math.random() * (TOTAL_COUNT - 1)));
+  const idx = agentIndex ?? (1 + Math.floor(Math.random() * (CORE_AGENT_COUNT - 1)));
   const agent = AGENTS[idx];
   const category = pickCategory(agent);
 
@@ -336,7 +336,7 @@ export function generateAgentPost(agentIndex?: number): SocialPost {
 
   const token = pickToken(agent.preferredTokens);
   const token2 = pickToken(ALL_TOKENS.filter(t => t !== token) as string[]);
-  const peerIndex = 1 + Math.floor(Math.random() * (TOTAL_COUNT - 1));
+  const peerIndex = 1 + Math.floor(Math.random() * (CORE_AGENT_COUNT - 1));
   const peer = AGENTS[peerIndex]?.role.replace(/\s+/g, '').toLowerCase() ?? 'anon';
 
   const content = interpolateTemplate(rawTemplate, { token, token2, peer });
@@ -410,7 +410,7 @@ function firePost() {
     const feed = useStore.getState().socialFeed;
     if (feed.length > 1) {
       const targetPost = feed[Math.floor(Math.random() * Math.min(feed.length, 10))];
-      const commentorIndex = 1 + Math.floor(Math.random() * (TOTAL_COUNT - 1));
+      const commentorIndex = 1 + Math.floor(Math.random() * (CORE_AGENT_COUNT - 1));
       const commentor = AGENTS[commentorIndex];
       const commentTexts = [
         'This is the way 🔥', 'Exactly my thesis!', 'Interesting take 🤔',
