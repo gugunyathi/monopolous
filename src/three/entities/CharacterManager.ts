@@ -68,6 +68,9 @@ export class CharacterManager {
   // ADK Agent Badges — floating sprites above autonomous agents
   private badgeSprites: THREE.Sprite[] = [];
 
+  // CEO body label sprite
+  private ceoLabelSprite: THREE.Sprite | null = null;
+
   // Uniforms
   private uSpeed = uniform(0.015);
   private uSeparationRadius = uniform(0.6);
@@ -267,6 +270,58 @@ export class CharacterManager {
     }
 
     console.log('[CharacterManager] Created', this.badgeSprites.length, 'ADK badge sprites');
+
+    // ── CEO body label ────────────────────────────────────────
+    const ceoCanvas = document.createElement('canvas');
+    ceoCanvas.width = 256;
+    ceoCanvas.height = 96;
+    const cctx = ceoCanvas.getContext('2d');
+    if (cctx) {
+      // Rounded pill background
+      const rw = 256, rh = 96, r = 48;
+      cctx.clearRect(0, 0, rw, rh);
+      cctx.beginPath();
+      cctx.moveTo(r, 0);
+      cctx.lineTo(rw - r, 0);
+      cctx.quadraticCurveTo(rw, 0, rw, r);
+      cctx.lineTo(rw, rh - r);
+      cctx.quadraticCurveTo(rw, rh, rw - r, rh);
+      cctx.lineTo(r, rh);
+      cctx.quadraticCurveTo(0, rh, 0, rh - r);
+      cctx.lineTo(0, r);
+      cctx.quadraticCurveTo(0, 0, r, 0);
+      cctx.closePath();
+      // Gold gradient fill
+      const grad = cctx.createLinearGradient(0, 0, 0, rh);
+      grad.addColorStop(0, '#f59e0b');
+      grad.addColorStop(1, '#b45309');
+      cctx.fillStyle = grad;
+      cctx.fill();
+      // White stroke
+      cctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      cctx.lineWidth = 4;
+      cctx.stroke();
+      // CEO text
+      cctx.font = 'black 52px Arial';
+      cctx.fillStyle = '#ffffff';
+      cctx.textAlign = 'center';
+      cctx.textBaseline = 'middle';
+      cctx.shadowColor = 'rgba(0,0,0,0.5)';
+      cctx.shadowBlur = 6;
+      cctx.fillText('C E O', rw / 2, rh / 2);
+    }
+    const ceoTex = new THREE.CanvasTexture(ceoCanvas);
+    ceoTex.needsUpdate = true;
+    const ceoMat = new THREE.SpriteMaterial({
+      map: ceoTex,
+      transparent: true,
+      depthWrite: false,
+      sizeAttenuation: true,
+    });
+    this.ceoLabelSprite = new THREE.Sprite(ceoMat);
+    this.ceoLabelSprite.scale.set(0.9, 0.34, 1);
+    this.ceoLabelSprite.renderOrder = 999;
+    this.scene.add(this.ceoLabelSprite);
   }
 
   /**
@@ -277,6 +332,14 @@ export class CharacterManager {
     if (!this.debugPosArray || this.badgeSprites.length === 0) return;
 
     const activeADKAgents = useStore.getState().activeADKAgents;
+
+    // Update CEO body label (chest height ~0.65 units up)
+    if (this.ceoLabelSprite && this.debugPosArray) {
+      const cx = this.debugPosArray[PLAYER_INDEX * 4 + 0];
+      const cy = this.debugPosArray[PLAYER_INDEX * 4 + 1] || 0;
+      const cz = this.debugPosArray[PLAYER_INDEX * 4 + 2];
+      this.ceoLabelSprite.position.set(cx, cy + 0.65, cz);
+    }
 
     for (let i = 0; i < this.instanceCount; i++) {
       const sprite = this.badgeSprites[i];
@@ -311,6 +374,14 @@ export class CharacterManager {
       if (sprite.material.map) sprite.material.map.dispose();
     }
     this.badgeSprites = [];
+
+    // Clean up CEO label
+    if (this.ceoLabelSprite) {
+      this.scene.remove(this.ceoLabelSprite);
+      (this.ceoLabelSprite.material as THREE.SpriteMaterial).map?.dispose();
+      this.ceoLabelSprite.material.dispose();
+      this.ceoLabelSprite = null;
+    }
   }
 
   private initInstances() {
