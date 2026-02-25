@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { AGENTS } from '../data/agents';
-import { Trophy, Wallet, ChevronUp, ChevronDown, Zap, X, Check, Copy, LogIn, TrendingUp, TrendingDown, Target, Flame, BarChart2 } from 'lucide-react';
+import { Trophy, Wallet, ChevronUp, ChevronDown, Zap, X, Check, Copy, LogIn, TrendingUp, TrendingDown, Target, Flame, BarChart2, Package } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BasePayButton } from '@base-org/account-ui/react';
 import { signInWithBase } from '../services/baseAccountService';
@@ -15,6 +15,47 @@ function agentWinRate(index: number, risk: string): number {
 function agentTradeCount(index: number): number {
   return 12 + (index % 89);
 }
+
+// ── Deterministic asset generator ────────────────────────────────────────────
+const RE_LIST  = ['Downtown Penthouse', 'Miami Beach Villa', 'NYC SoHo Loft', 'Tokyo Shibuya Apt', 'Dubai Sky Tower', 'London Chelsea Flat', 'LA Hills Mansion', 'Singapore Bay Suite'];
+const CAR_LIST = ['Lamborghini Urus', 'Ferrari 488 Pista', 'Rolls-Royce Ghost', 'Porsche 911 GT3', 'McLaren 720S', 'Bentley Continental', 'Tesla Plaid X', 'Bugatti Chiron'];
+const ART_LIST = ['Bored Ape #4421', 'CryptoPunk #7804', 'Fidenza #566', 'Ringers Print 879', 'AI Canvas IV', 'Larva Labs Original', 'Damien Hirst Spin', 'Basquiat Lithograph'];
+const WATCH_LIST = ['Rolex Daytona Ice', 'Patek Philippe 5711', 'AP Royal Oak 15500', 'Richard Mille RM11', 'F.P. Journe Tourbillon'];
+const MISC_LIST  = ['50ft Sailing Yacht', 'Private Jet Share', 'Rare Whisky Cellar', 'Gold Bar Collection', '15-Carat Diamond Set', 'Vintage Bordeaux Vault', 'Stradivari Violin'];
+
+const ASSET_POOL = [
+  { icon: '🏠', label: 'Real Estate', list: RE_LIST },
+  { icon: '🚗', label: 'Vehicles',    list: CAR_LIST },
+  { icon: '🎨', label: 'Art & NFT',   list: ART_LIST },
+  { icon: '⌚', label: 'Watches',     list: WATCH_LIST },
+  { icon: '💎', label: 'Collectibles',list: MISC_LIST },
+];
+
+function dr(index: number, seed: number): number {
+  let h = 0x811c9dc5;
+  const s = `ag-${index}-s${seed}`;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return (h >>> 0) / 0xffffffff;
+}
+
+function agentAssets(index: number, risk: string): Array<{ icon: string; category: string; name: string; value: string }> {
+  const extra = risk === 'Degen' || risk === 'High' ? 1 : 0;
+  const count = Math.min(5, 2 + extra + (index % 3 === 0 ? 1 : 0));
+  const results: Array<{ icon: string; category: string; name: string; value: string }> = [];
+  const usedCats = new Set<string>();
+  for (let i = 0; i < count * 4 && results.length < count; i++) {
+    const cat = ASSET_POOL[Math.floor(dr(index, i * 3) * ASSET_POOL.length)];
+    if (usedCats.has(cat.label)) continue;
+    usedCats.add(cat.label);
+    const name = cat.list[Math.floor(dr(index, i * 3 + 1) * cat.list.length)];
+    const rawVal = 8000 + Math.floor(dr(index, i * 3 + 2) * 492000);
+    const val = Math.round(rawVal / 1000) * 1000;
+    const valStr = val >= 1_000_000 ? `$${(val / 1_000_000).toFixed(1)}M` : `$${(val / 1000).toFixed(0)}K`;
+    results.push({ icon: cat.icon, category: cat.label, name, value: valStr });
+  }
+  return results;
+}
+
 const RISK_COLOR: Record<string, string> = {
   Low: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
   Medium: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
@@ -294,6 +335,42 @@ const Leaderboard: React.FC = () => {
                     <div className="px-3 pb-3 flex flex-wrap gap-1">
                       {fundingAgent.expertise.map(e => (
                         <span key={e} className="text-[7px] font-black bg-white/5 text-zinc-400 border border-white/5 px-1.5 py-0.5 rounded-full">{e}</span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ── Agent Assets ── */}
+              {(() => {
+                const assets = agentAssets(fundingAgent.index, fundingAgent.riskLevel);
+                const totalVal = assets.reduce((sum, a) => {
+                  const n = parseFloat(a.value.replace('$', '').replace('M', '000').replace('K', ''));
+                  return sum + (a.value.includes('M') ? n * 1000 : n);
+                }, 0);
+                return (
+                  <div className="mx-5 mb-4 rounded-2xl border border-white/5 overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-2 bg-white/[0.03] border-b border-white/5">
+                      <div className="flex items-center gap-1.5">
+                        <Package size={11} className="text-amber-400" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Assets Portfolio</span>
+                      </div>
+                      <span className="text-[9px] font-black text-amber-400">
+                        ~${totalVal >= 1000 ? `${(totalVal / 1000).toFixed(1)}M` : `${totalVal}K`} est.
+                      </span>
+                    </div>
+                    <div className="divide-y divide-white/[0.04]">
+                      {assets.map((asset, i) => (
+                        <div key={i} className="flex items-center justify-between px-3 py-2 hover:bg-white/[0.02] transition-colors">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm leading-none">{asset.icon}</span>
+                            <div>
+                              <p className="text-[9px] font-black text-white leading-tight">{asset.name}</p>
+                              <p className="text-[7px] uppercase tracking-widest text-zinc-600 font-bold">{asset.category}</p>
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-black text-zinc-300 tabular-nums">{asset.value}</span>
+                        </div>
                       ))}
                     </div>
                   </div>
