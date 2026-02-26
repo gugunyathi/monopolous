@@ -1,5 +1,5 @@
 
-import * as THREE from 'three/webgpu';
+import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 export class Stage {
@@ -84,7 +84,7 @@ export class Stage {
     // 2. Create New Plane
     const planeGeometry = new THREE.PlaneGeometry(diameter, diameter);
     planeGeometry.rotateX(-Math.PI / 2);
-    const planeMaterial = new THREE.MeshStandardNodeMaterial({
+    const planeMaterial = new THREE.MeshStandardMaterial({
       color: 0x111111,
       transparent: true,
       opacity: 0.8,

@@ -1,28 +1,25 @@
 
-import * as THREE from 'three/webgpu';
+import * as THREE from 'three';
 
 export class Engine {
-  public renderer: THREE.WebGPURenderer;
+  public renderer: THREE.WebGLRenderer;
   public timer: THREE.Timer;
 
   constructor(container: HTMLElement) {
-    this.renderer = new THREE.WebGPURenderer({ antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     
-    // Use default shadow map (PCF) as VSM support in WebGPU/NodeMaterial can be sensitive
     this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     
     container.appendChild(this.renderer.domElement);
     this.timer = new THREE.Timer();
   }
 
   public async init() {
-    try {
-      await this.renderer.init();
-    } catch (e) {
-      console.error("WebGPU initialization failed:", e);
-    }
+    // WebGLRenderer doesn't need async init, but we keep the signature
+    return Promise.resolve();
   }
 
   public onResize(width: number, height: number) {

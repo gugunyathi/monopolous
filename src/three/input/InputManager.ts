@@ -1,4 +1,4 @@
-import * as THREE from 'three/webgpu';
+import * as THREE from 'three';
 import { PLAYER_INDEX } from '../../data/agents';
 import { useStore } from '../../store/useStore';
 

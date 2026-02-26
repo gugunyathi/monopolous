@@ -9,7 +9,7 @@ import { AGENTS, PLAYER_INDEX } from '../data/agents';
 import { useStore } from '../store/useStore';
 import { AgentBehavior, ChatMessage } from '../types';
 import { geminiService } from '../services/geminiService';
-import * as THREE from 'three/webgpu';
+import * as THREE from 'three';
 
 export class SceneManager {
   private engine: Engine;

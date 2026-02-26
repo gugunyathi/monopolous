@@ -32,8 +32,6 @@ export default defineConfig(({mode}) => {
           },
         },
       },
-      // three/webgpu is inherently large (~900 kB); silence expected warning
-      chunkSizeWarningLimit: 1000,
     },    server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.

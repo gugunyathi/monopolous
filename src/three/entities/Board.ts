@@ -1,5 +1,5 @@
 
-import * as THREE from 'three/webgpu';
+import * as THREE from 'three';
 import { BoardTile } from '../../types';
 import { AGENTS } from '../../data/agents';
 

@@ -1,4 +1,4 @@
-import * as THREE from 'three/webgpu';
+import * as THREE from 'three';
 
 const CHARACTER_Y_OFFSET = 0.9;
 
@@ -14,7 +14,7 @@ export class DebugMarkers {
 
   constructor(private scene: THREE.Scene, maxCount: number) {
     const geo = new THREE.SphereGeometry(0.18, 6, 5);
-    const mat = new THREE.MeshBasicNodeMaterial({ color: 0xff6600 });
+    const mat = new THREE.MeshBasicMaterial({ color: 0xff6600 });
     mat.transparent = true;
     mat.opacity = 0.85;
     mat.depthTest = false; // always visible, even through geometry
