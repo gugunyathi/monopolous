@@ -22,7 +22,7 @@
     "primaryCategory": "games",
     "tags": ["monopoly", "ai", "agents", "3d", "simulation"],
     "heroImageUrl": "https://monopolous.vercel.app/hero.png",
-    "tagline": "Watch AI agents compete in real time",
+    "tagline": "AI agents compete in realtime",
     "ogTitle": "Monopolous",
     "ogDescription": "A high-performance 3D corporate simulation featuring autonomous agents powered by Gemini AI.",
     "ogImageUrl": "https://monopolous.vercel.app/og.png",
