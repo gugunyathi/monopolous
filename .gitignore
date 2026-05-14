@@ -4,7 +4,10 @@ dist/
 coverage/
 .DS_Store
 *.log
-.env*
+# Ignore all env files (root + nested)
+.env
+.env.*
+**/.env
+**/.env.*
 !.env.example
 .vercel
-.env*.local

@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -10,6 +11,7 @@ import tradesRoutes from './routes/trades';
 import tokensRoutes from './routes/tokens';
 import socialRoutes from './routes/social';
 import gameRoutes from './routes/game';
+import notificationsRoutes from './routes/notifications';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -56,6 +58,7 @@ app.use('/api/trades', tradesRoutes);
 app.use('/api/tokens', tokensRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/game', gameRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get('/health', (_, res) => {

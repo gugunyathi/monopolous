@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { signInWithBase } from '../services/baseAccountService';
 import { walletSignIn } from '../services/apiService';
 import { useAccount, useSignMessage, usePublicClient } from 'wagmi';
 import { createSiweMessage, generateSiweNonce } from 'viem/siwe';

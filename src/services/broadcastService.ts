@@ -1,6 +1,7 @@
 import { Broadcast } from '../types';
 import { useStore } from '../store/useStore';
 import { AGENTS } from '../data/agents';
+import { sendBroadcastNotification } from './baseNotificationsService';
 
 // ── Market Broadcast Templates ────────────────────────────────────────────────
 
@@ -121,6 +122,16 @@ function fireBroadcast() {
 
   const store = useStore.getState();
   store.addBroadcast(broadcast);
+
+  if (store.userAddress) {
+    void sendBroadcastNotification({
+      title: `CEO ${t.category.toUpperCase()}`,
+      message: `${t.headline} ${t.detail}`,
+      targetPath: '/',
+    }).catch((error) => {
+      console.warn('[Notifications] Broadcast notification failed:', error);
+    });
+  }
 
   // Some agents react by posting
   const REACT_COUNT = 3 + Math.floor(Math.random() * 4); // 3-6 agents react

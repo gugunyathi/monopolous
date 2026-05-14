@@ -1,6 +1,7 @@
 import React from 'react';
 import { BasePayButton } from '@base-org/account-ui/react';
 import { PaymentOptions } from '../services/baseAccountService';
+import { getBuilderCodeDataSuffix } from '../constants/builderCode';
 
 interface PaymentResult {
   success: boolean;
@@ -34,9 +35,17 @@ const PayButton: React.FC<PayButtonProps> = ({
   onPaymentResult,
   onClick,
 }) => {
+  const dataSuffix = getBuilderCodeDataSuffix();
+
   return (
     <BasePayButton
-      paymentOptions={{ amount, to, testnet, ...(payerInfo ? { payerInfo } : {}) }}
+      paymentOptions={{
+        amount,
+        to,
+        testnet,
+        ...(dataSuffix ? { dataSuffix } : {}),
+        ...(payerInfo ? { payerInfo } : {}),
+      }}
       colorScheme={colorScheme}
       size={size}
       variant={variant}

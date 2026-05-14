@@ -1,4 +1,5 @@
 import { createBaseAccountSDK, pay, getPaymentStatus } from '@base-org/account';
+import { getBuilderCodeDataSuffix } from '../constants/builderCode';
 
 // Initialize the Base Account SDK
 const sdk = createBaseAccountSDK({
@@ -77,10 +78,12 @@ export interface PaymentResult {
 }
 
 export async function makePayment(options: PaymentOptions): Promise<PaymentResult> {
+  const dataSuffix = getBuilderCodeDataSuffix();
   const result = await pay({
     amount: options.amount,
     to: options.to,
     testnet: options.testnet ?? false,
+    ...(dataSuffix ? { dataSuffix } : {}),
     ...(options.payerInfo ? { payerInfo: options.payerInfo } : {}),
   });
 
