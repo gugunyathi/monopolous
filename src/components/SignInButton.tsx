@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { signInWithBase } from '../services/baseAccountService';
 import { useStore } from '../store/useStore';
+import { walletSignIn, clearToken, getToken, getMe, setSessionId } from '../services/apiService';
 
 const SignInButton: React.FC = () => {
   const { userAddress, setUserAddress } = useStore();
@@ -17,6 +18,21 @@ const SignInButton: React.FC = () => {
     try {
       const { address } = await signInWithBase();
       setUserAddress(address);
+
+      // Authenticate with backend (non-blocking — game works without it)
+      try {
+        await walletSignIn(address, async (message: string) => {
+          // Re-use the ethers provider from base account SDK for signing
+          const provider = (window as unknown as Record<string, unknown>).__baseProvider;
+          if (provider && typeof (provider as Record<string, unknown>).request === 'function') {
+            return (provider as { request: (args: { method: string; params: unknown[] }) => Promise<string> })
+              .request({ method: 'personal_sign', params: [message, address] });
+          }
+          throw new Error('No wallet provider for signing');
+        });
+      } catch {
+        console.warn('[Auth] Backend sign-in unavailable — continuing in offline mode');
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (!msg.toLowerCase().includes('reject') && !msg.toLowerCase().includes('cancel')) {

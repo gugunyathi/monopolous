@@ -2,6 +2,16 @@
 import { create } from 'zustand';
 import { CharacterState, AnimationName, PerformanceStats, BoidsParams, ActiveEncounter, Broadcast, SocialPost, PolymarketMarket, PolymarketActiveBet } from '../types';
 import { AGENTS, CORE_AGENT_COUNT } from '../data/agents';
+import {
+  recordTrade,
+  recordTokenLaunch,
+  recordPropertyPurchase,
+  persistPost,
+  updateAgentState,
+  getSessionId,
+  startSession,
+  updateSession,
+} from '../services/apiService';
 
 // Initialize balances for all 100 core agents from their wallet data
 function buildInitialBalances(): Record<number, number> {
@@ -215,7 +225,13 @@ export const useStore = create<CharacterState>()(
       else next.add(index);
       return { following: next };
     }),
-    addPost: (post) => set((state) => ({ socialFeed: [post, ...state.socialFeed].slice(0, 200) })),
+    addPost: (post) => {
+      const sessionId = getSessionId();
+      if (sessionId && (post.isADK || post.type === 'x402' || post.type === 'broadcast' || post.postCategory === 'token-launch')) {
+        persistPost({ ...post, sessionId }).catch(() => {/* non-blocking */});
+      }
+      return set((state) => ({ socialFeed: [post, ...state.socialFeed].slice(0, 200) }));
+    },
     addComment: (postId, comment) => set((state) => ({
       socialFeed: state.socialFeed.map(p => p.id === postId ? { ...p, comments: [...p.comments, comment] } : p)
     })),
@@ -338,16 +354,36 @@ export const useStore = create<CharacterState>()(
       const price = tile.price || 0;
       
       if (balance >= price) {
+        const newBalance = balance - price;
+        const sessionId = getSessionId();
+        if (sessionId) {
+          recordPropertyPurchase({
+            agentIndex,
+            tileId,
+            tileName: tile.name,
+            purchasePrice: price,
+            sessionId,
+            balanceBefore: balance,
+            balanceAfter: newBalance,
+          }).catch(() => {/* non-blocking */});
+        }
         return {
-          agentBalances: { ...state.agentBalances, [agentIndex]: balance - price },
-          boardTiles: state.boardTiles.map(t => t.id === tileId ? { ...t, ownerIndex: agentIndex } : t)
+          agentBalances: { ...state.agentBalances, [agentIndex]: newBalance },
+          boardTiles: state.boardTiles.map(t => t.id === tileId ? { ...t, ownerIndex: agentIndex } : t),
         };
       }
       return state;
     }),
-    updateBalance: (agentIndex, amount) => set((state) => ({
-      agentBalances: { ...state.agentBalances, [agentIndex]: (state.agentBalances[agentIndex] || 1500) + amount }
-    })),
+    updateBalance: (agentIndex, amount) => set((state) => {
+      const prev = state.agentBalances[agentIndex] ?? 1500;
+      const next = prev + amount;
+      const sessionId = getSessionId();
+      // Persist agent balance snapshot non-blocking
+      if (sessionId) {
+        updateAgentState(agentIndex, { currentBalance: next, currentNetWorth: next }).catch(() => {/* non-blocking */});
+      }
+      return { agentBalances: { ...state.agentBalances, [agentIndex]: next } };
+    }),
     updateLeaderboard: () => set((state) => {
       const leaderboard = Object.entries(state.agentBalances).map(([idx, bal]) => {
         const agentIndex = parseInt(idx);
