@@ -21,7 +21,7 @@ export interface NotificationStatus {
   notificationsEnabled: boolean;
 }
 
-function authHeaders(): HeadersInit {
+function authHeaders(): Record<string, string> {
   const token = getToken();
   return {
     'Content-Type': 'application/json',
