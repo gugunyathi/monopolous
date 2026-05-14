@@ -28,8 +28,6 @@ export default defineConfig(({mode}) => {
             if (id.includes('node_modules/react')) return 'vendor-react';
             if (id.includes('node_modules/lucide-react') || id.includes('node_modules/zustand')) return 'vendor-ui';
             if (id.includes('/src/three/')) return 'scene';
-            if (id.includes('/src/services/')) return 'services';
-            if (id.includes('/src/components/')) return 'components';
           },
         },
       },
