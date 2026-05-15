@@ -13,8 +13,9 @@
  */
 
 import { SocialPost, PostCategory } from '../../types';
-import { AGENTS, CORE_AGENT_COUNT } from '../../data/agents';
+import { AGENTS, ARC_AGENTS, CORE_AGENT_COUNT } from '../../data/agents';
 import { useStore } from '../../store/useStore';
+import { executeArcTransfer as executeArcTransferRequest } from '../apiService';
 import {
   POLYMARKET_SIMULATED,
   searchMarkets,
@@ -44,6 +45,13 @@ import {
   isProvisioned,
   formatCapabilities,
 } from '../bnkrWalletService';
+
+function getAgentByIndex(agentIndex: number) {
+  if (agentIndex >= 0 && agentIndex < AGENTS.length) {
+    return AGENTS[agentIndex];
+  }
+  return ARC_AGENTS.find((agent) => agent.index === agentIndex);
+}
 
 // ─── Tool Function Declarations (Gemini function calling schema) ─────────────
 
@@ -473,7 +481,7 @@ export function executeTool(
   args: Record<string, any>,
 ): SocialPost | null {
   const store = useStore.getState();
-  const agent = AGENTS[agentIndex];
+  const agent = getAgentByIndex(agentIndex);
   if (!agent) return null;
 
   const balance = store.agentBalances[agentIndex] ?? agent.wallet.balance;
@@ -510,6 +518,24 @@ export function executeTool(
     // ── Send USDC ──────────────────────────────────────────
     case 'send_usdc': {
       const { recipient_role, amount: sendAmt, reason } = args;
+
+      if (agent.wallet.chain === 'arc-testnet') {
+        const pendingAmount = Math.max(0.1, Math.round(Math.abs(sendAmt || 1) * 100) / 100);
+        return {
+          id: postId,
+          agentIndex,
+          type: 'post',
+          content: `⏳ ARC transfer queued: $${pendingAmount.toFixed(2)} USDC\n\nTarget: ${recipient_role || 'ARC peer'}\n${reason ? `💭 ${reason}` : ''}`,
+          token: 'USDC',
+          action: 'sell',
+          likes: 0,
+          comments: [],
+          timestamp: now,
+          postCategory: 'general',
+          isADK: true,
+        };
+      }
+
       const capped = Math.round(Math.min(Math.abs(sendAmt || 5), balance * 0.3) * 100) / 100;
       if (capped < 0.5) return null;
 
@@ -1340,6 +1366,82 @@ export async function executePolymarketTool(
       type: 'post',
       content: `❌ Polymarket action failed: ${toolName.replace('polymarket_', '')}\n\n${err.message?.slice(0, 100) || 'Unknown error'}`,
       token: '',
+      action: undefined,
+      likes: 0,
+      comments: [],
+      timestamp: now,
+      postCategory: 'general',
+      isADK: true,
+    };
+  }
+}
+
+// ─── Async ARC Tool Execution ────────────────────────────────────────────────
+
+export async function executeArcTool(
+  agentIndex: number,
+  toolName: string,
+  args: Record<string, any>,
+): Promise<SocialPost | null> {
+  const agent = getAgentByIndex(agentIndex);
+  if (!agent || agent.wallet.chain !== 'arc-testnet') return null;
+
+  const now = Date.now();
+  const postId = `arc-${agentIndex}-${now}-${Math.random().toString(36).slice(2, 6)}`;
+
+  if (toolName !== 'send_usdc') {
+    return null;
+  }
+
+  try {
+    const { recipient_role, amount: sendAmt, reason } = args;
+    const keyword = String(recipient_role || '').toLowerCase().split(' ')[0];
+    const recipient = ARC_AGENTS.find((a) =>
+      a.index !== agentIndex &&
+      (a.role.toLowerCase().includes(keyword) || a.department.toLowerCase().includes(keyword)),
+    ) ?? ARC_AGENTS.find((a) => a.index !== agentIndex);
+
+    if (!recipient) {
+      throw new Error('No ARC recipient available');
+    }
+
+    const amount = Math.max(0.1, Math.round(Math.abs(sendAmt || 1) * 100) / 100);
+    const result = await executeArcTransferRequest({
+      agentIndex,
+      toAddress: recipient.wallet.address,
+      amount: amount.toFixed(2),
+      reason: reason || `Autonomous ARC transfer from ${agent.role}`,
+    });
+
+    if (!result) {
+      throw new Error('ARC transfer request failed');
+    }
+
+    return {
+      id: postId,
+      agentIndex,
+      type: 'post',
+      content:
+        `🛰 ARC transfer submitted\n\n` +
+        `$${amount.toFixed(2)} USDC → @${recipient.role.replace(/\s+/g, '').toLowerCase()}\n` +
+        `Execution: ${result.executionId.slice(0, 8)}…\n` +
+        `${result.txHash ? `Tx: ${result.txHash.slice(0, 10)}…${result.txHash.slice(-4)}\n` : ''}` +
+        `${reason ? `💭 ${String(reason).slice(0, 120)}` : ''}`,
+      token: 'USDC',
+      action: 'sell',
+      likes: Math.floor(Math.random() * 8),
+      comments: [],
+      timestamp: now,
+      postCategory: 'general',
+      isADK: true,
+    };
+  } catch (err: any) {
+    return {
+      id: postId,
+      agentIndex,
+      type: 'post',
+      content: `❌ ARC transfer failed\n\n${err?.message?.slice(0, 140) || 'Unknown error'}`,
+      token: 'USDC',
       action: undefined,
       likes: 0,
       comments: [],

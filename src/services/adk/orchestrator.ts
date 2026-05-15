@@ -14,9 +14,9 @@
  */
 
 import { GoogleGenAI } from '@google/genai';
-import { AGENTS, CORE_AGENT_COUNT } from '../../data/agents';
+import { AGENTS, ARC_AGENTS, CORE_AGENT_COUNT } from '../../data/agents';
 import { useStore } from '../../store/useStore';
-import { WALLET_TOOL_DECLARATIONS, BANKR_TOOL_DECLARATIONS, BNKR_WALLET_TOOL_DECLARATIONS, POLYMARKET_TOOL_DECLARATIONS, executeTool, executeBankrTool, executeBnkrWalletTool, executePolymarketTool } from './tools';
+import { WALLET_TOOL_DECLARATIONS, BANKR_TOOL_DECLARATIONS, BNKR_WALLET_TOOL_DECLARATIONS, POLYMARKET_TOOL_DECLARATIONS, executeTool, executeArcTool, executeBankrTool, executeBnkrWalletTool, executePolymarketTool } from './tools';
 import { isBankrBotAvailable } from '../bankrBotService';
 import { getLaunchedTokens } from '../tokenLaunchService';
 import {
@@ -32,6 +32,7 @@ import {
 
 const MODEL = 'gemini-2.0-flash';
 const AGENTS_PER_CYCLE = 5;
+const ARC_AGENTS_PER_CYCLE = 1;
 const CYCLE_MIN_MS = 45_000;
 const CYCLE_MAX_MS = 90_000;
 const AGENT_DELAY_MS = 2_500;         // pause between agent calls
@@ -64,10 +65,20 @@ function sleep(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms));
 }
 
+function getAgentByIndex(agentIndex: number) {
+  if (agentIndex >= 0 && agentIndex < AGENTS.length) {
+    return AGENTS[agentIndex];
+  }
+  return ARC_AGENTS.find((agent) => agent.index === agentIndex);
+}
+
 // ─── System Prompt Builder ───────────────────────────────────────────────────
 
 function buildSystemPrompt(agentIndex: number): string {
-  const agent = AGENTS[agentIndex];
+  const agent = getAgentByIndex(agentIndex);
+  if (!agent) {
+    throw new Error(`Unknown agent index ${agentIndex}`);
+  }
   const store = useStore.getState();
   const balance = store.agentBalances[agentIndex] ?? agent.wallet.balance;
 
@@ -86,7 +97,7 @@ function buildSystemPrompt(agentIndex: number): string {
     .filter((p) => p.token && agent.preferredTokens.includes(p.token))
     .slice(0, 3)
     .map((p) => {
-      const a = AGENTS[p.agentIndex];
+      const a = getAgentByIndex(p.agentIndex);
       return `• @${a?.role.replace(/\s+/g, '').toLowerCase()}: ${p.content.slice(0, 100)}`;
     })
     .join('\n');
@@ -172,7 +183,11 @@ ${bankrAvailable ? '8. Occasionally use BankrBot tools for real on-chain activit
 async function processAgent(agentIndex: number): Promise<boolean> {
   if (!ai || !running) return false;
 
-  const agent = AGENTS[agentIndex];
+  const agent = getAgentByIndex(agentIndex);
+  if (!agent) {
+    console.warn(`[ADK] Unknown agent index ${agentIndex}, skipping`);
+    return true;
+  }
   const store = useStore.getState();
   const balance = store.agentBalances[agentIndex] ?? agent.wallet.balance;
 
@@ -217,68 +232,90 @@ async function processAgent(agentIndex: number): Promise<boolean> {
     const fcs = response.functionCalls;
     if (fcs && fcs.length > 0) {
       const fc = fcs[0];
+      const toolName = fc.name;
+      if (!toolName) {
+        console.warn(`[ADK] #${agentIndex} returned an unnamed tool call`);
+        return true;
+      }
+
       console.log(
-        `[ADK] 🧠 #${agentIndex} ${agent.role} → ${fc.name}(${JSON.stringify(fc.args)})`,
+        `[ADK] 🧠 #${agentIndex} ${agent.role} → ${toolName}(${JSON.stringify(fc.args)})`,
       );
 
       // Check if this is a BankrBot tool (async execution)
-      const isBankrTool = fc.name.startsWith('bankr_');
-      const isBnkrWalletTool = fc.name.startsWith('bnkr_');
-      const isPolymarketTool = fc.name === 'search_polymarket_markets' || fc.name === 'place_polymarket_bet';
+      const isBankrTool = toolName.startsWith('bankr_');
+      const isBnkrWalletTool = toolName.startsWith('bnkr_');
+      const isPolymarketTool = toolName === 'search_polymarket_markets' || toolName === 'place_polymarket_bet';
+      const isArcTool = agent.wallet.chain === 'arc-testnet' && toolName === 'send_usdc';
 
-      if (isBankrTool) {
-        // Post a placeholder immediately
-        const placeholder = executeTool(agentIndex, fc.name, fc.args ?? {});
+      if (isArcTool) {
+        const placeholder = executeTool(agentIndex, toolName, fc.args ?? {});
         if (placeholder) {
           store.addPost(placeholder);
-          console.log(`[ADK] ⏳ BankrBot async: ${fc.name}`);
+          console.log(`[ADK] ⏳ ARC async: ${toolName}`);
+        }
+
+        executeArcTool(agentIndex, toolName, fc.args ?? {}).then((resultPost) => {
+          if (resultPost) {
+            store.addPost(resultPost);
+            console.log(`[ADK] ✅ ARC complete: ${resultPost.content.slice(0, 80)}…`);
+          }
+        }).catch((err) => {
+          console.error(`[ADK] ❌ ARC ${toolName} failed:`, err);
+        });
+      } else if (isBankrTool) {
+        // Post a placeholder immediately
+        const placeholder = executeTool(agentIndex, toolName, fc.args ?? {});
+        if (placeholder) {
+          store.addPost(placeholder);
+          console.log(`[ADK] ⏳ BankrBot async: ${toolName}`);
         }
 
         // Execute the real BankrBot call asynchronously (don't block the cycle)
-        executeBankrTool(agentIndex, fc.name, fc.args ?? {}).then((resultPost) => {
+        executeBankrTool(agentIndex, toolName, fc.args ?? {}).then((resultPost) => {
           if (resultPost) {
             store.addPost(resultPost);
             console.log(`[ADK] ✅ BankrBot complete: ${resultPost.content.slice(0, 80)}…`);
           }
         }).catch((err) => {
-          console.error(`[ADK] ❌ BankrBot ${fc.name} failed:`, err);
+          console.error(`[ADK] ❌ BankrBot ${toolName} failed:`, err);
         });
       } else if (isBnkrWalletTool) {
         // BNKR wallet tools — synchronous placeholder, async execution
-        const placeholder = executeTool(agentIndex, fc.name, fc.args ?? {});
+        const placeholder = executeTool(agentIndex, toolName, fc.args ?? {});
         if (placeholder) {
           store.addPost(placeholder);
-          console.log(`[ADK] ⏳ BNKR wallet: ${fc.name}`);
+          console.log(`[ADK] ⏳ BNKR wallet: ${toolName}`);
         }
 
         // Execute BNKR wallet tool asynchronously
-        executeBnkrWalletTool(agentIndex, fc.name, fc.args ?? {}).then((resultPost) => {
+        executeBnkrWalletTool(agentIndex, toolName, fc.args ?? {}).then((resultPost) => {
           if (resultPost) {
             store.addPost(resultPost);
             console.log(`[ADK] ✅ BNKR wallet complete: ${resultPost.content.slice(0, 80)}…`);
           }
         }).catch((err) => {
-          console.error(`[ADK] ❌ BNKR ${fc.name} failed:`, err);
+          console.error(`[ADK] ❌ BNKR ${toolName} failed:`, err);
         });
       } else if (isPolymarketTool) {
         // Polymarket tools — placeholder immediately, async fetch enriches the result
-        const placeholder = executeTool(agentIndex, fc.name, fc.args ?? {});
+        const placeholder = executeTool(agentIndex, toolName, fc.args ?? {});
         if (placeholder) {
           store.addPost(placeholder);
-          console.log(`[ADK] ⏳ Polymarket async: ${fc.name}`);
+          console.log(`[ADK] ⏳ Polymarket async: ${toolName}`);
         }
 
-        executePolymarketTool(agentIndex, fc.name, fc.args ?? {}).then((resultPost) => {
+        executePolymarketTool(agentIndex, toolName, fc.args ?? {}).then((resultPost) => {
           if (resultPost) {
             store.addPost(resultPost);
             console.log(`[ADK] 🎯 Polymarket complete: ${resultPost.content.slice(0, 80)}…`);
           }
         }).catch((err) => {
-          console.error(`[ADK] ❌ Polymarket ${fc.name} failed:`, err);
+          console.error(`[ADK] ❌ Polymarket ${toolName} failed:`, err);
         });
       } else {
         // Standard tool — synchronous execution
-        const post = executeTool(agentIndex, fc.name, fc.args ?? {});
+        const post = executeTool(agentIndex, toolName, fc.args ?? {});
         if (post) {
           store.addPost(post);
           console.log(`[ADK] ✅ ${post.content.slice(0, 80)}…`);
@@ -324,12 +361,18 @@ async function processAgent(agentIndex: number): Promise<boolean> {
 // ─── Cycle Logic ─────────────────────────────────────────────────────────────
 
 function pickAgents(count: number): number[] {
-  const pool: number[] = [];
+  const corePool: number[] = [];
   for (let i = 1; i < CORE_AGENT_COUNT; i++) {
-    if (!recentlyProcessed.has(i)) pool.push(i);
+    if (!recentlyProcessed.has(i)) corePool.push(i);
   }
 
-  const selected = shuffle(pool).slice(0, count);
+  const arcPool = ARC_AGENTS
+    .map((agent) => agent.index)
+    .filter((idx) => !recentlyProcessed.has(idx));
+
+  const selectedCore = shuffle(corePool).slice(0, count);
+  const selectedArc = shuffle(arcPool).slice(0, ARC_AGENTS_PER_CYCLE);
+  const selected = [...selectedCore, ...selectedArc];
 
   for (const idx of selected) {
     recentlyProcessed.add(idx);
@@ -347,7 +390,10 @@ async function runCycle(): Promise<void> {
 
   const agents = pickAgents(AGENTS_PER_CYCLE);
   console.log(
-    `\n[ADK] ─── Cycle: agents [${agents.map((i) => `#${i} ${AGENTS[i].role}`).join(', ')}] ───`,
+    `\n[ADK] ─── Cycle: agents [${agents.map((i) => {
+      const agent = getAgentByIndex(i);
+      return `#${i} ${agent?.role ?? 'Unknown'}`;
+    }).join(', ')}] ───`,
   );
 
   // Mark all agents as ADK-controlled for this cycle

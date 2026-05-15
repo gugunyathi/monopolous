@@ -1,0 +1,4 @@
+
+> autonomous-characters-lab@0.0.0 build:server
+> tsc -p server/tsconfig.json
+

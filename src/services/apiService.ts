@@ -217,6 +217,52 @@ export interface AgentStateRecord {
   lastActiveAt: string;
 }
 
+export interface ArcPolicyRecord {
+  _id: string;
+  agentIndex: number;
+  enabled: boolean;
+  allowlistedToAddresses: string[];
+  allowlistedTokenAddresses: string[];
+  maxUsdcPerTx: number;
+  maxUsdcPerDay: number;
+  cooldownSeconds: number;
+  lastExecutedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ArcExecutionRecord {
+  _id: string;
+  agentIndex: number;
+  actionType: 'transfer';
+  chain: string;
+  walletAddress: string;
+  toAddress: string;
+  tokenAddress?: string;
+  amount: string;
+  idempotencyKey: string;
+  reason?: string;
+  requestedBy: string;
+  status: 'queued' | 'estimated' | 'submitted' | 'confirmed' | 'failed';
+  estimateOnly: boolean;
+  txHash?: string;
+  transactionId?: string;
+  blockNumber?: number;
+  confirmations?: number;
+  confirmedAt?: string;
+  errorMessage?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ArcExecutionRefreshSummary {
+  refreshed: number;
+  confirmed: number;
+  failed: number;
+  pending: number;
+  rpcConfigured: boolean;
+}
+
 // ─── Users ────────────────────────────────────────────────────────────────────
 
 export async function getUser(address: string): Promise<UserProfile | null> {
@@ -442,6 +488,119 @@ export async function getLeaderboard(): Promise<AgentStateRecord[]> {
 export async function getAllTimeLeaderboard(): Promise<unknown[]> {
   const { data } = await apiFetch<{ leaderboard: unknown[] }>('/game/leaderboard/all-time');
   return data?.leaderboard ?? [];
+}
+
+// ─── ARC Admin ────────────────────────────────────────────────────────────────
+
+export async function getArcStatus(): Promise<{
+  status: {
+    enabled: boolean;
+    chain: string;
+    configuredWallets: number;
+    maxUsdcPerTx: number;
+    maxUsdcPerDay: number;
+    defaultCooldownSeconds: number;
+    rpcConfigured: boolean;
+    confirmationsRequired: number;
+  };
+  wallets: Array<{ agentIndex: number; walletAddress: string }>;
+  policies: ArcPolicyRecord[];
+} | null> {
+  const { data } = await apiFetch<{
+    success: boolean;
+    status: {
+      enabled: boolean;
+      chain: string;
+      configuredWallets: number;
+      maxUsdcPerTx: number;
+      maxUsdcPerDay: number;
+      defaultCooldownSeconds: number;
+      rpcConfigured: boolean;
+      confirmationsRequired: number;
+    };
+    wallets: Array<{ agentIndex: number; walletAddress: string }>;
+    policies: ArcPolicyRecord[];
+  }>('/arc/status', {}, true);
+
+  if (!data) return null;
+  return {
+    status: data.status,
+    wallets: data.wallets ?? [],
+    policies: data.policies ?? [],
+  };
+}
+
+export async function getArcPolicies(): Promise<ArcPolicyRecord[]> {
+  const { data } = await apiFetch<{ success: boolean; policies: ArcPolicyRecord[] }>('/arc/policies', {}, true);
+  return data?.policies ?? [];
+}
+
+export async function updateArcPolicy(agentIndex: number, updates: {
+  enabled?: boolean;
+  allowlistedToAddresses?: string[];
+  allowlistedTokenAddresses?: string[];
+  maxUsdcPerTx?: number;
+  maxUsdcPerDay?: number;
+  cooldownSeconds?: number;
+}): Promise<ArcPolicyRecord> {
+  const { data } = await apiFetch<{ success: boolean; policy: ArcPolicyRecord }>(
+    `/arc/policies/${agentIndex}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    },
+    true
+  );
+  if (!data?.policy) {
+    throw new Error('Failed to update ARC policy');
+  }
+  return data.policy;
+}
+
+export async function getArcExecutions(
+  limit = 20,
+  refresh = false,
+): Promise<{ executions: ArcExecutionRecord[]; refresh?: ArcExecutionRefreshSummary }> {
+  const q = new URLSearchParams();
+  q.set('limit', String(limit));
+  if (refresh) q.set('refresh', 'true');
+
+  const { data } = await apiFetch<{
+    success: boolean;
+    executions: ArcExecutionRecord[];
+    refresh?: ArcExecutionRefreshSummary;
+  }>(`/arc/executions?${q.toString()}`, {}, true);
+
+  return {
+    executions: data?.executions ?? [],
+    refresh: data?.refresh,
+  };
+}
+
+export async function executeArcTransfer(params: {
+  agentIndex: number;
+  toAddress: string;
+  amount: string;
+  tokenAddress?: string;
+  reason?: string;
+}): Promise<{ executionId: string; status: 'estimated' | 'submitted' | 'confirmed'; txHash?: string; transactionId?: string } | null> {
+  const { data } = await apiFetch<{
+    success: boolean;
+    result: { executionId: string; status: 'estimated' | 'submitted' | 'confirmed'; txHash?: string; transactionId?: string };
+  }>('/arc/transfer/execute', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  }, true);
+
+  return data?.result ?? null;
+}
+
+export async function refreshArcExecutionConfirmations(limit = 20): Promise<ArcExecutionRefreshSummary | null> {
+  const { data } = await apiFetch<{ success: boolean; refresh: ArcExecutionRefreshSummary }>('/arc/executions/refresh', {
+    method: 'POST',
+    body: JSON.stringify({ limit }),
+  }, true);
+  return data?.refresh ?? null;
 }
 
 // ─── Sign-In with Base Wallet ─────────────────────────────────────────────────

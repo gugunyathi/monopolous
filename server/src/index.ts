@@ -13,6 +13,7 @@ import socialRoutes from './routes/social.js';
 import gameRoutes from './routes/game.js';
 import notificationsRoutes from './routes/notifications.js';
 import adminRoutes from './routes/admin.js';
+import arcRoutes from './routes/arc.js';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -61,6 +62,7 @@ app.use('/api/social', socialRoutes);
 app.use('/api/game', gameRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/arc', arcRoutes);
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get('/health', (_, res) => {

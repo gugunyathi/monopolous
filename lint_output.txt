@@ -1,0 +1,44 @@
+
+> autonomous-characters-lab@0.0.0 lint
+> tsc --noEmit
+
+src/components/Leaderboard.tsx(455,23): error TS2322: Type '{ paymentOptions: { amount: string; to: string; testnet: boolean; }; colorScheme: "dark"; size: string; variant: string; onPaymentResult: (result: { success: boolean; transactionHash?: string | undefined; error?: string | undefined; }) => void; }' is not assignable to type 'IntrinsicAttributes & BasePayButtonProps'.
+  Property 'paymentOptions' does not exist on type 'IntrinsicAttributes & BasePayButtonProps'.
+src/components/PayButton.tsx(42,7): error TS2322: Type '{ paymentOptions: { payerInfo?: PayerInfo | undefined; dataSuffix?: `0x${string}` | undefined; amount: string; to: string; testnet: boolean; }; colorScheme: "light" | "system" | "dark"; ... 4 more ...; onPaymentResult: ((result: PaymentResult) => void) | undefined; }' is not assignable to type 'IntrinsicAttributes & BasePayButtonProps'.
+  Property 'paymentOptions' does not exist on type 'IntrinsicAttributes & BasePayButtonProps'.
+src/services/adk/orchestrator.ts(225,27): error TS18048: 'fc.name' is possibly 'undefined'.
+src/services/adk/orchestrator.ts(226,32): error TS18048: 'fc.name' is possibly 'undefined'.
+src/services/adk/orchestrator.ts(231,53): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/services/adk/orchestrator.ts(238,38): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/services/adk/orchestrator.ts(248,53): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/services/adk/orchestrator.ts(255,43): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/services/adk/orchestrator.ts(265,53): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/services/adk/orchestrator.ts(271,43): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/services/adk/orchestrator.ts(281,46): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/three/core/Engine.ts(2,24): error TS7016: Could not find a declaration file for module 'three'. 'C:/Users/Acer/Documents/monopolous/monopolous/node_modules/three/build/three.module.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/three` if it exists or add a new declaration (.d.ts) file containing `declare module 'three';`
+src/three/core/Stage.ts(2,24): error TS7016: Could not find a declaration file for module 'three'. 'C:/Users/Acer/Documents/monopolous/monopolous/node_modules/three/build/three.module.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/three` if it exists or add a new declaration (.d.ts) file containing `declare module 'three';`
+src/three/core/Stage.ts(3,31): error TS7016: Could not find a declaration file for module 'three/addons/controls/OrbitControls.js'. 'C:/Users/Acer/Documents/monopolous/monopolous/node_modules/three/examples/jsm/controls/OrbitControls.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/three` if it exists or add a new declaration (.d.ts) file containing `declare module 'three/addons/controls/OrbitControls.js';`
+src/three/debug/DebugMarkers.ts(1,24): error TS7016: Could not find a declaration file for module 'three'. 'C:/Users/Acer/Documents/monopolous/monopolous/node_modules/three/build/three.module.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/three` if it exists or add a new declaration (.d.ts) file containing `declare module 'three';`
+src/three/entities/Board.ts(2,24): error TS7016: Could not find a declaration file for module 'three'. 'C:/Users/Acer/Documents/monopolous/monopolous/node_modules/three/build/three.module.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/three` if it exists or add a new declaration (.d.ts) file containing `declare module 'three';`
+src/three/entities/CharacterManager.ts(1,24): error TS7016: Could not find a declaration file for module 'three'. 'C:/Users/Acer/Documents/monopolous/monopolous/node_modules/three/build/three.module.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/three` if it exists or add a new declaration (.d.ts) file containing `declare module 'three';`
+src/three/entities/CharacterManager.ts(2,28): error TS7016: Could not find a declaration file for module 'three/addons/loaders/GLTFLoader.js'. 'C:/Users/Acer/Documents/monopolous/monopolous/node_modules/three/examples/jsm/loaders/GLTFLoader.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/three` if it exists or add a new declaration (.d.ts) file containing `declare module 'three/addons/loaders/GLTFLoader.js';`
+src/three/entities/CharacterManager.ts(51,23): error TS7006: Parameter 'child' implicitly has an 'any' type.
+src/three/entities/CharacterManager.ts(61,25): error TS7006: Parameter 'child' implicitly has an 'any' type.
+src/three/input/InputManager.ts(1,24): error TS7016: Could not find a declaration file for module 'three'. 'C:/Users/Acer/Documents/monopolous/monopolous/node_modules/three/build/three.module.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/three` if it exists or add a new declaration (.d.ts) file containing `declare module 'three';`
+src/three/SceneManager.ts(12,24): error TS7016: Could not find a declaration file for module 'three'. 'C:/Users/Acer/Documents/monopolous/monopolous/node_modules/three/build/three.module.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/three` if it exists or add a new declaration (.d.ts) file containing `declare module 'three';`
