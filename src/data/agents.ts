@@ -22,11 +22,20 @@ export type WalletSkill =
   | 'x402';
 
 export interface AgentWallet {
-  address: string;            // 0x… Ethereum address on Base
+  address: string;            // 0x… Ethereum address on Base / ARC
   skills: WalletSkill[];      // agentic-wallet skills this agent can use
   balance: number;            // USDC balance (display only for NPCs)
-  chain: 'base' | 'base-sepolia';
+  chain: 'base' | 'base-sepolia' | 'arc-testnet';
 }
+
+// ─────────────────────────────────────────────────────────────
+//  ARC Testnet chain constants
+// ─────────────────────────────────────────────────────────────
+export const ARC_CHAIN_ID = 5042002;
+export const ARC_RPC_BASE = 'https://rpc.testnet.arc-node.thecanteenapp.com/v1';
+export const ARC_EXPLORER = 'https://testnet.arcscan.app';
+export const ARC_AGENT_START = 2000;   // Indices 2000–2009 are ARC agents
+export const ARC_AGENT_COUNT = 10;
 
 export interface AgentData {
   index: number;
@@ -436,3 +445,167 @@ export const AGENTS: AgentData[] = _agents;
 export function getAgent(index: number): AgentData | undefined {
   return _agents[index];
 }
+
+// ─────────────────────────────────────────────────────────────
+//  ARC Testnet Agents (indices 2000–2009)
+//  These agents run on Arc Blockchain testnet (Chain ID 5042002),
+//  pay gas in USDC, and do NOT use BankrBot wallets.
+// ─────────────────────────────────────────────────────────────
+
+const ARC_ROLES: Array<{
+  role: string;
+  expertise: string[];
+  mission: string;
+  personality: string;
+  traderPersonality: string;
+  tradingStyle: string;
+  riskLevel: 'Low' | 'Medium' | 'High' | 'Degen';
+  preferredTokens: string[];
+  outfit: string;
+  color: string;
+}> = [
+  {
+    role: 'Protocol Architect',
+    expertise: ['Layer-2 Scaling', 'USDC Gas Abstraction', 'EVM Compatibility'],
+    mission: 'Design the settlement layer for cross-chain USDC flows on Arc testnet',
+    personality: 'Methodical systems thinker who obsesses over throughput and finality guarantees',
+    traderPersonality: 'Institutional',
+    tradingStyle: 'Macro Trend Following',
+    riskLevel: 'Low',
+    preferredTokens: ['USDC', 'ETH'],
+    outfit: 'Sharp navy suit with silver circuit-board cufflinks',
+    color: '#6366f1',
+  },
+  {
+    role: 'Chain Validator',
+    expertise: ['Node Operation', 'Consensus Mechanisms', 'Arc Testnet RPC'],
+    mission: 'Run and monitor Arc testnet validator nodes and report anomalies',
+    personality: 'Vigilant guardian who treats uptime as a moral imperative',
+    traderPersonality: 'Algo',
+    tradingStyle: 'Mean Reversion',
+    riskLevel: 'Low',
+    preferredTokens: ['USDC'],
+    outfit: 'Black turtleneck and noise-cancelling headphones',
+    color: '#22d3ee',
+  },
+  {
+    role: 'DeFi Architect',
+    expertise: ['AMM Design', 'USDC Liquidity', 'Base Chain Bridges'],
+    mission: 'Bootstrap liquidity pools on Arc testnet using USDC from Base chain',
+    personality: 'Pragmatic liquidity maximalist who follows capital flows',
+    traderPersonality: 'Swing',
+    tradingStyle: 'Momentum',
+    riskLevel: 'High',
+    preferredTokens: ['USDC', 'ETH', 'WETH'],
+    outfit: 'Hoodie with "Gas is Free If You Use USDC" print',
+    color: '#f59e0b',
+  },
+  {
+    role: 'Bridge Engineer',
+    expertise: ['Cross-Chain Messaging', 'CCTP', 'Circle USDC Bridge'],
+    mission: 'Implement and stress-test USDC bridges between Base and Arc testnet',
+    personality: 'Detail-oriented plumber who lives in transaction receipts',
+    traderPersonality: 'Arbitrage',
+    tradingStyle: 'Statistical Arbitrage',
+    riskLevel: 'Medium',
+    preferredTokens: ['USDC', 'ETH'],
+    outfit: 'Hard hat and tool belt with USB drives instead of tools',
+    color: '#10b981',
+  },
+  {
+    role: 'Smart Contract Auditor',
+    expertise: ['Solidity Security', 'Fuzzing', 'Formal Verification'],
+    mission: 'Audit all Arc testnet smart contracts before mainnet graduation',
+    personality: 'Paranoid perfectionist who finds bugs in their sleep',
+    traderPersonality: 'Conservative',
+    tradingStyle: 'Value Investing',
+    riskLevel: 'Low',
+    preferredTokens: ['USDC'],
+    outfit: 'White lab coat, red pens everywhere',
+    color: '#ef4444',
+  },
+  {
+    role: 'Tokenomics Researcher',
+    expertise: ['USDC Gas Mechanics', 'Fee Market Design', 'Incentive Engineering'],
+    mission: 'Model and simulate the Arc USDC gas economy to optimise fee parameters',
+    personality: 'Data-obsessed economist who speaks fluent Python and LaTeX',
+    traderPersonality: 'Quant',
+    tradingStyle: 'Factor Investing',
+    riskLevel: 'Medium',
+    preferredTokens: ['USDC', 'ETH'],
+    outfit: 'Blazer over a spreadsheet-patterned shirt',
+    color: '#a855f7',
+  },
+  {
+    role: 'DevRel Engineer',
+    expertise: ['SDK Integration', 'Arc CLI', 'Developer Onboarding'],
+    mission: 'Help external developers integrate with Arc testnet RPC and ship examples',
+    personality: 'Enthusiastic community builder who codes tutorials at 2 am',
+    traderPersonality: 'Trend Follower',
+    tradingStyle: 'Breakout Trading',
+    riskLevel: 'Medium',
+    preferredTokens: ['USDC', 'ETH'],
+    outfit: 'Branded Arc hoodie and always-on laptop stickers',
+    color: '#f97316',
+  },
+  {
+    role: 'Indexer Specialist',
+    expertise: ['Event Indexing', 'GraphQL', 'Arc Block Explorer'],
+    mission: 'Build a real-time USDC transfer index for the Arc testnet explorer',
+    personality: 'Invisible infrastructure hero who surfaces hidden data patterns',
+    traderPersonality: 'Algo',
+    tradingStyle: 'High-Frequency',
+    riskLevel: 'Degen',
+    preferredTokens: ['USDC'],
+    outfit: 'Dark glasses and server-rack tie',
+    color: '#84cc16',
+  },
+  {
+    role: 'Gas Optimiser',
+    expertise: ['EVM Bytecode', 'USDC Gas Profiling', 'Calldata Compression'],
+    mission: 'Reduce average USDC gas cost per transaction by 40% on Arc testnet',
+    personality: 'Frugal byte-watcher who counts opcodes like others count calories',
+    traderPersonality: 'Scalper',
+    tradingStyle: 'Micro-Cap',
+    riskLevel: 'Degen',
+    preferredTokens: ['USDC'],
+    outfit: 'Minimalist grey t-shirt — wastes nothing, even fabric',
+    color: '#64748b',
+  },
+  {
+    role: 'Mainnet Migration Lead',
+    expertise: ['Testnet-to-Mainnet', 'Deployment Pipelines', 'Risk Assessment'],
+    mission: 'Coordinate the Arc testnet-to-mainnet graduation checklist and go-live',
+    personality: 'Calm under pressure; treats every deploy like a moon launch',
+    traderPersonality: 'Institutional',
+    tradingStyle: 'Long-Term Hold',
+    riskLevel: 'Low',
+    preferredTokens: ['USDC', 'ETH'],
+    outfit: 'Aerospace-style flight jacket with Arc mission patch',
+    color: '#0ea5e9',
+  },
+];
+
+const _arcAgents: AgentData[] = ARC_ROLES.map((r, i) => ({
+  index: ARC_AGENT_START + i,
+  department: 'ARC Protocol',
+  role: r.role,
+  expertise: r.expertise,
+  mission: r.mission,
+  personality: r.personality,
+  isPlayer: false,
+  color: r.color,
+  wallet: {
+    address: generateWalletAddress(ARC_AGENT_START + i),
+    skills: ['authenticate-wallet', 'send-usdc', 'pay-for-service', 'search-for-service'],
+    balance: 500, // USDC on Arc testnet
+    chain: 'arc-testnet',
+  },
+  traderPersonality: r.traderPersonality,
+  tradingStyle: r.tradingStyle,
+  riskLevel: r.riskLevel,
+  preferredTokens: r.preferredTokens,
+  outfit: r.outfit,
+}));
+
+export const ARC_AGENTS: AgentData[] = _arcAgents;

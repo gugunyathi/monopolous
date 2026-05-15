@@ -16,6 +16,7 @@ import Leaderboard from './Leaderboard';
 import CameraControls from './CameraControls';
 import TokenLaunchesPanel from './TokenLaunchesPanel';
 import { BnkrWalletPanel } from './BnkrWalletPanel';
+import { ArcAgentsPanel } from './ArcAgentsPanel';
 import NotificationDeepLinkCard from './NotificationDeepLinkCard';
 
 const UIOverlay: React.FC = () => {
@@ -83,6 +84,13 @@ const UIOverlay: React.FC = () => {
       {/* BNKR Wallet Panel — shows in social/posts/world modes */}
       {(viewMode === 'social' || viewMode === 'posts' || viewMode === 'world') && (
         <BnkrWalletPanel />
+      )}
+
+      {/* ARC Protocol Agents Panel — shows in social/posts/world modes */}
+      {(viewMode === 'social' || viewMode === 'posts' || viewMode === 'world') && (
+        <div className="fixed bottom-20 sm:bottom-24 left-3 sm:left-4 z-[105] pointer-events-auto">
+          <ArcAgentsPanel />
+        </div>
       )}
 
       {/* Live Notification Toast */}
