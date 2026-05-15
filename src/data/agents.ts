@@ -586,6 +586,16 @@ const ARC_ROLES: Array<{
   },
 ];
 
+function parseArcWalletOverrides(): string[] {
+  const raw = (import.meta.env.VITE_ARC_AGENT_WALLETS as string | undefined) ?? '';
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => /^0x[a-fA-F0-9]{40}$/.test(s));
+}
+
+const ARC_WALLET_OVERRIDES = parseArcWalletOverrides();
+
 const _arcAgents: AgentData[] = ARC_ROLES.map((r, i) => ({
   index: ARC_AGENT_START + i,
   department: 'ARC Protocol',
@@ -596,7 +606,7 @@ const _arcAgents: AgentData[] = ARC_ROLES.map((r, i) => ({
   isPlayer: false,
   color: r.color,
   wallet: {
-    address: generateWalletAddress(ARC_AGENT_START + i),
+    address: ARC_WALLET_OVERRIDES[i] ?? generateWalletAddress(ARC_AGENT_START + i),
     skills: ['authenticate-wallet', 'send-usdc', 'pay-for-service', 'search-for-service'],
     balance: 500, // USDC on Arc testnet
     chain: 'arc-testnet',
