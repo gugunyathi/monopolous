@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useAccount } from 'wagmi';
 import SignInButton from './SignInButton';
 import NotificationStatusIndicator from './NotificationStatusIndicator';
+import { useStore } from '../store/useStore';
 import { getAdminOverview, AdminOverviewResponse } from '../services/adminService';
 import {
   getConsentedUsers,
@@ -19,6 +20,7 @@ function shortAddress(address: string): string {
 
 const AdminPage: React.FC = () => {
   const { address, isConnected } = useAccount();
+  const { userAddress } = useStore();
   const [tab, setTab] = useState<AdminTab>('notifications');
   const [overview, setOverview] = useState<AdminOverviewResponse | null>(null);
   const [audience, setAudience] = useState<ConsentedUsersResponse | null>(null);
@@ -53,14 +55,18 @@ const AdminPage: React.FC = () => {
   const configuredAdmin = (import.meta.env.VITE_ADMIN_WALLET_ADDRESS as string | undefined)?.toLowerCase();
   const connectedAddress = address?.toLowerCase();
   const isConfigured = Boolean(configuredAdmin);
-  const isCorrectWallet = Boolean(configuredAdmin && connectedAddress && configuredAdmin === connectedAddress);
+  const isWalletMatch = Boolean(configuredAdmin && connectedAddress && configuredAdmin === connectedAddress);
+  // requireAdmin on the backend requires a JWT — user must complete SIWE sign-in, not just connect
+  const isSignedIn = Boolean(userAddress && userAddress.toLowerCase() === connectedAddress);
+  const isCorrectWallet = isWalletMatch && isSignedIn;
 
   const authStatusText = useMemo(() => {
     if (!isConfigured) return 'Admin wallet not configured (set VITE_ADMIN_WALLET_ADDRESS)';
-    if (!isConnected || !address) return 'Connect and sign in with admin wallet';
-    if (!isCorrectWallet) return `Connected wallet ${shortAddress(address)} is not admin`;
+    if (!isConnected || !address) return 'Connect your admin wallet';
+    if (!isWalletMatch) return `Connected wallet ${shortAddress(address)} is not the admin wallet`;
+    if (!isSignedIn) return 'Click "Sign in with Ethereum" to authenticate';
     return 'Admin wallet verified';
-  }, [isConfigured, isConnected, address, isCorrectWallet]);
+  }, [isConfigured, isConnected, address, isWalletMatch, isSignedIn]);
 
   async function loadOverview() {
     setLoadingOverview(true);
@@ -136,7 +142,7 @@ const AdminPage: React.FC = () => {
     if (!isCorrectWallet) return;
     void loadOverview();
     void loadAudience();
-  }, [isCorrectWallet]);
+  }, [isCorrectWallet, userAddress]);
 
   // Allow scrolling on admin page (global CSS sets overflow:hidden on html/body/#root)
   useEffect(() => {
