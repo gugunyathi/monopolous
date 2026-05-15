@@ -16,6 +16,7 @@ import Leaderboard from './Leaderboard';
 import CameraControls from './CameraControls';
 import TokenLaunchesPanel from './TokenLaunchesPanel';
 import { BnkrWalletPanel } from './BnkrWalletPanel';
+import NotificationDeepLinkCard from './NotificationDeepLinkCard';
 
 const UIOverlay: React.FC = () => {
   const { 
@@ -60,6 +61,8 @@ const UIOverlay: React.FC = () => {
 
       {/* About Landing Page */}
       <AboutPage />
+
+      <NotificationDeepLinkCard />
 
       <AnimatePresence>
         <ChatPanel />

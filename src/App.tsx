@@ -22,6 +22,18 @@ const App: React.FC = () => {
   const managerRef = useRef<SceneManager | null>(null);
 
   useEffect(() => {
+    if (isAdminRoute) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const section = params.get('section');
+    if (!section) return;
+
+    if (section === 'about' || section === 'world' || section === 'social' || section === 'posts') {
+      useStore.getState().setViewMode(section);
+    }
+  }, [isAdminRoute]);
+
+  useEffect(() => {
   }, []);
 
   useEffect(() => {

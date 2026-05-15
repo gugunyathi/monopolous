@@ -35,6 +35,20 @@ const AdminPage: React.FC = () => {
   const [ctaLabel, setCtaLabel] = useState('Open Monopolous');
   const [ctaUrl, setCtaUrl] = useState('https://monopolous.vercel.app');
   const [imageUrl, setImageUrl] = useState('');
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [section, setSection] = useState<'about' | 'world' | 'social' | 'posts' | 'admin'>('world');
+  const [textColor, setTextColor] = useState('#22d3ee');
+  const [fontFamily, setFontFamily] = useState('Space Grotesk');
+  const [fontWeight, setFontWeight] = useState('700');
+
+  function appendEmoji(emoji: string) {
+    setMessage((prev) => `${prev} ${emoji}`.trim());
+  }
+
+  function buildSectionPath(): string {
+    if (section === 'admin') return '/admin';
+    return `/?section=${encodeURIComponent(section)}`;
+  }
 
   const configuredAdmin = (import.meta.env.VITE_ADMIN_WALLET_ADDRESS as string | undefined)?.toLowerCase();
   const connectedAddress = address?.toLowerCase();
@@ -92,11 +106,16 @@ const AdminPage: React.FC = () => {
       const response = await sendBroadcastNotification({
         title,
         message,
-        targetPath,
+        targetPath: targetPath.trim() ? targetPath : buildSectionPath(),
         subtitle,
         ctaLabel,
         ctaUrl,
         imageUrl,
+        mediaUrl,
+        section,
+        textColor,
+        fontFamily,
+        fontWeight,
       });
 
       if (!response) {
@@ -163,8 +182,16 @@ const AdminPage: React.FC = () => {
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
               <h2 className="text-lg font-bold">Send Rich Notification</h2>
+              <p className="text-xs text-zinc-400">Push providers usually render plain text, so rich style and media settings are embedded into deep links and app-side presentation.</p>
               <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="w-full rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-sm" />
               <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Message" rows={3} className="w-full rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-sm" />
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => appendEmoji('🔥')} className="rounded-md bg-white/10 px-2 py-1 text-sm hover:bg-white/20">🔥</button>
+                <button type="button" onClick={() => appendEmoji('🚀')} className="rounded-md bg-white/10 px-2 py-1 text-sm hover:bg-white/20">🚀</button>
+                <button type="button" onClick={() => appendEmoji('🎯')} className="rounded-md bg-white/10 px-2 py-1 text-sm hover:bg-white/20">🎯</button>
+                <button type="button" onClick={() => appendEmoji('💎')} className="rounded-md bg-white/10 px-2 py-1 text-sm hover:bg-white/20">💎</button>
+                <button type="button" onClick={() => appendEmoji('⚡')} className="rounded-md bg-white/10 px-2 py-1 text-sm hover:bg-white/20">⚡</button>
+              </div>
               <input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="Subtitle (optional)" className="w-full rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-sm" />
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 <input value={ctaLabel} onChange={(e) => setCtaLabel(e.target.value)} placeholder="CTA label" className="rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-sm" />
@@ -173,6 +200,34 @@ const AdminPage: React.FC = () => {
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 <input value={targetPath} onChange={(e) => setTargetPath(e.target.value)} placeholder="Target path" className="rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-sm" />
                 <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="Image URL (optional)" className="rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-sm" />
+              </div>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                <select value={section} onChange={(e) => setSection(e.target.value as 'about' | 'world' | 'social' | 'posts' | 'admin')} className="rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-sm">
+                  <option value="world">Open section: World</option>
+                  <option value="social">Open section: Social</option>
+                  <option value="posts">Open section: Posts</option>
+                  <option value="about">Open section: About</option>
+                  <option value="admin">Open section: Admin</option>
+                </select>
+                <input value={mediaUrl} onChange={(e) => setMediaUrl(e.target.value)} placeholder="GIF or tiny image URL" className="rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-sm" />
+              </div>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} className="rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-sm">
+                  <option value="Space Grotesk">Font: Space Grotesk</option>
+                  <option value="Sora">Font: Sora</option>
+                  <option value="Manrope">Font: Manrope</option>
+                  <option value="sans-serif">Font: System Sans</option>
+                </select>
+                <select value={fontWeight} onChange={(e) => setFontWeight(e.target.value)} className="rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-sm">
+                  <option value="500">Weight: 500</option>
+                  <option value="600">Weight: 600</option>
+                  <option value="700">Weight: 700</option>
+                  <option value="800">Weight: 800</option>
+                </select>
+                <input value={textColor} onChange={(e) => setTextColor(e.target.value)} placeholder="Text color hex" className="rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-sm" />
+              </div>
+              <div className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs" style={{ color: textColor, fontFamily, fontWeight: Number(fontWeight) as 500 | 600 | 700 | 800 }}>
+                Preview: {title} - {message}
               </div>
               <button disabled={!isCorrectWallet || sending} onClick={() => void sendRichNotification()} className="rounded-xl bg-emerald-400 px-4 py-2 text-sm font-black uppercase tracking-widest text-zinc-900 disabled:opacity-50">
                 {sending ? 'Sending...' : 'Send Notification'}

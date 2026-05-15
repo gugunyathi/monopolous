@@ -76,6 +76,11 @@ export async function sendBroadcastNotification(params: {
   ctaLabel?: string;
   ctaUrl?: string;
   imageUrl?: string;
+  mediaUrl?: string;
+  section?: 'about' | 'world' | 'social' | 'posts' | 'admin';
+  textColor?: string;
+  fontFamily?: string;
+  fontWeight?: string;
 }): Promise<SendResponse | null> {
   const response = await fetch(`${API_BASE}/notifications/send-broadcast`, {
     method: 'POST',
@@ -88,6 +93,11 @@ export async function sendBroadcastNotification(params: {
       ctaLabel: params.ctaLabel,
       ctaUrl: params.ctaUrl,
       imageUrl: params.imageUrl,
+      mediaUrl: params.mediaUrl,
+      section: params.section,
+      textColor: params.textColor,
+      fontFamily: params.fontFamily,
+      fontWeight: params.fontWeight,
     }),
   });
 
