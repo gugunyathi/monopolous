@@ -1,9 +1,13 @@
 import { Router, Request, Response } from 'express';
-import { ethers } from 'ethers';
+import { createPublicClient, http } from 'viem';
+import { base } from 'viem/chains';
+import { parseSiweMessage } from 'viem/siwe';
 import { v4 as uuidv4 } from 'uuid';
 import { Nonce } from '../models/Nonce';
 import { User } from '../models/User';
 import { signToken, requireAuth } from '../middleware/auth';
+
+const viemClient = createPublicClient({ chain: base, transport: http() });
 
 const router = Router();
 
@@ -28,12 +32,12 @@ router.post('/nonce', async (req: Request, res: Response) => {
 });
 
 // ─── POST /api/auth/verify ───────────────────────────────────────────────────
-// Verify signed nonce, create/update user, return JWT.
+// Verify signed SIWE message, create/update user, return JWT.
 router.post('/verify', async (req: Request, res: Response) => {
-  const { address, signature, nonce } = req.body;
+  const { address, message, signature } = req.body;
 
-  if (!address || !signature || !nonce) {
-    res.status(400).json({ error: 'address, signature, and nonce are required' });
+  if (!address || !message || !signature) {
+    res.status(400).json({ error: 'address, message, and signature are required' });
     return;
   }
 
@@ -42,18 +46,31 @@ router.post('/verify', async (req: Request, res: Response) => {
     return;
   }
 
-  // Find nonce for this address
-  const nonceDoc = await Nonce.findOne({ address: address.toLowerCase(), nonce });
+  // Parse the SIWE message to extract nonce
+  let parsedNonce: string;
+  try {
+    const parsed = parseSiweMessage(message);
+    parsedNonce = parsed.nonce;
+  } catch {
+    res.status(400).json({ error: 'Invalid SIWE message format' });
+    return;
+  }
+
+  // Check nonce exists and belongs to this address
+  const nonceDoc = await Nonce.findOne({ address: address.toLowerCase(), nonce: parsedNonce });
   if (!nonceDoc) {
     res.status(401).json({ error: 'Nonce not found or expired. Request a new nonce.' });
     return;
   }
 
-  // Verify the wallet signature
-  const message = `Sign in to Monopolous\n\nNonce: ${nonce}\n\nThis request will not trigger a blockchain transaction or cost any gas fees.`;
+  // Verify signature via viem (handles ERC-6492 smart wallets)
   try {
-    const recovered = ethers.verifyMessage(message, signature);
-    if (recovered.toLowerCase() !== address.toLowerCase()) {
+    const valid = await viemClient.verifyMessage({
+      address: address as `0x${string}`,
+      message,
+      signature: signature as `0x${string}`,
+    });
+    if (!valid) {
       res.status(401).json({ error: 'Signature verification failed' });
       return;
     }

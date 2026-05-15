@@ -1,18 +1,15 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { walletSignIn } from '../services/apiService';
-import { useAccount, useSignMessage, usePublicClient } from 'wagmi';
-import { createSiweMessage, generateSiweNonce } from 'viem/siwe';
+import { useAccount, useSignMessage } from 'wagmi';
 
 const SignInButton: React.FC = () => {
   const { userAddress, setUserAddress } = useStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-
   const { address, chainId, isConnected } = useAccount();
   const { signMessageAsync } = useSignMessage();
-  const publicClient = usePublicClient();
 
   const handleClick = async () => {
     if (userAddress) {
@@ -20,7 +17,7 @@ const SignInButton: React.FC = () => {
       return;
     }
 
-    if (!isConnected || !address || !chainId || !publicClient) {
+    if (!isConnected || !address || !chainId) {
       setError('Please connect your wallet first');
       return;
     }
@@ -29,33 +26,17 @@ const SignInButton: React.FC = () => {
     setError(null);
 
     try {
-      const nonce = generateSiweNonce();
-      const message = createSiweMessage({
+      const result = await walletSignIn(
         address,
         chainId,
-        domain: window.location.host,
-        nonce,
-        uri: window.location.origin,
-        version: '1',
-      });
+        (msg: string) => signMessageAsync({ message: msg, account: address }),
+      );
 
-      const signature = await signMessageAsync({ message, account: address });
-      const valid = await publicClient.verifySiweMessage({ message, signature });
-
-      if (!valid) {
-        setError('Signature verification failed');
-        setLoading(false);
-        return;
-      }
-
-      setUserAddress(address);
-
-      // Authenticate with backend (non-blocking — game works without it)
-      try {
-        await walletSignIn(address, async (msg: string) => {
-          return await signMessageAsync({ message: msg, account: address });
-        });
-      } catch {
+      if (result) {
+        setUserAddress(address);
+      } else {
+        // Backend unavailable — still allow offline play
+        setUserAddress(address);
         console.warn('[Auth] Backend sign-in unavailable — continuing in offline mode');
       }
     } catch (err) {

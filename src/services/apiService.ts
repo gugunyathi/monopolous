@@ -117,12 +117,12 @@ export async function requestNonce(address: string): Promise<string | null> {
 /** Step 2: Verify wallet signature and receive JWT */
 export async function verifySignature(
   address: string,
+  message: string,
   signature: string,
-  nonce: string,
 ): Promise<{ token: string; user: UserProfile } | null> {
   const { data } = await apiFetch<{ token: string; user: UserProfile }>('/auth/verify', {
     method: 'POST',
-    body: JSON.stringify({ address, signature, nonce }),
+    body: JSON.stringify({ address, message, signature }),
   });
   if (data?.token) setToken(data.token);
   return data;
@@ -455,6 +455,7 @@ export async function getAllTimeLeaderboard(): Promise<unknown[]> {
  */
 export async function walletSignIn(
   address: string,
+  chainId: number,
   signFn: (message: string) => Promise<string>,
 ): Promise<{ token: string; user: UserProfile; sessionId: string } | null> {
   const nonce = await requestNonce(address);
@@ -463,7 +464,17 @@ export async function walletSignIn(
     return null;
   }
 
-  const message = `Sign in to Monopolous\n\nNonce: ${nonce}\n\nThis request will not trigger a blockchain transaction or cost any gas fees.`;
+  // Build a SIWE-compliant message
+  const { createSiweMessage } = await import('viem/siwe');
+  const message = createSiweMessage({
+    address: address as `0x${string}`,
+    chainId,
+    domain: window.location.host,
+    nonce,
+    uri: window.location.origin,
+    version: '1',
+    statement: 'Sign in to Monopolous',
+  });
 
   let signature: string;
   try {
@@ -473,7 +484,7 @@ export async function walletSignIn(
     return null;
   }
 
-  const result = await verifySignature(address, signature, nonce);
+  const result = await verifySignature(address, message, signature);
   if (!result) {
     console.error('[API] Signature verification failed');
     return null;
