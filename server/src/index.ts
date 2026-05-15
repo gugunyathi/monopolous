@@ -78,10 +78,25 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: 'Internal server error' });
 });
 
+let startupPromise: Promise<void> | null = null;
+
+export async function ensureServerReady(): Promise<void> {
+  if (!startupPromise) {
+    startupPromise = connectDB().catch((error) => {
+      startupPromise = null;
+      throw error;
+    });
+  }
+
+  await startupPromise;
+}
+
+export default app;
+
 // ─── Startup ──────────────────────────────────────────────────────────────────
 async function start() {
   try {
-    await connectDB();
+    await ensureServerReady();
     app.listen(PORT, () => {
       console.log(`[Monopolous API] Running on port ${PORT}`);
       console.log(`[Monopolous API] CORS allowed origins: ${allowedOrigins.join(', ')}`);
@@ -92,4 +107,6 @@ async function start() {
   }
 }
 
-start();
+if (process.env.VERCEL !== '1') {
+  start();
+}
