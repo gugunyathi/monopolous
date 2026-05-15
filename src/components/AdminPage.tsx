@@ -138,8 +138,24 @@ const AdminPage: React.FC = () => {
     void loadAudience();
   }, [isCorrectWallet]);
 
+  // Allow scrolling on admin page (global CSS sets overflow:hidden on html/body/#root)
+  useEffect(() => {
+    const root = document.getElementById('root');
+    const prev = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = 'auto';
+    document.body.style.overflow = 'auto';
+    document.body.style.height = 'auto';
+    if (root) { root.style.overflow = 'auto'; root.style.height = 'auto'; }
+    return () => {
+      document.documentElement.style.overflow = prev;
+      document.body.style.overflow = '';
+      document.body.style.height = '';
+      if (root) { root.style.overflow = ''; root.style.height = ''; }
+    };
+  }, []);
+
   return (
-    <div className="min-h-screen overflow-y-auto bg-zinc-950 text-zinc-100 p-4 md:p-8">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4 md:p-8">
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
