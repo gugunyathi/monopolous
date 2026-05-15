@@ -1,10 +1,10 @@
 import { Router, Request, Response } from 'express';
-import { requireAdmin } from '../middleware/auth';
-import { User } from '../models/User';
-import { GameSession } from '../models/GameSession';
-import { Trade } from '../models/Trade';
-import { TokenLaunch } from '../models/TokenLaunch';
-import { SocialPost } from '../models/SocialPost';
+import { requireAdmin } from '../middleware/auth.js';
+import { User } from '../models/User.js';
+import { GameSession } from '../models/GameSession.js';
+import { Trade } from '../models/Trade.js';
+import { TokenLaunch } from '../models/TokenLaunch.js';
+import { SocialPost } from '../models/SocialPost.js';
 
 const router = Router();
 

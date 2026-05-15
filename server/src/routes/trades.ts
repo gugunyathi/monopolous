@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { Trade } from '../models/Trade';
-import { AgentState } from '../models/AgentState';
-import { requireAuth } from '../middleware/auth';
+import { Trade } from '../models/Trade.js';
+import { AgentState } from '../models/AgentState.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 

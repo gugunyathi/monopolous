@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { requireAuth, optionalAuth } from '../middleware/auth';
-import { SocialPost } from '../models/SocialPost';
+import { requireAuth, optionalAuth } from '../middleware/auth.js';
+import { SocialPost } from '../models/SocialPost.js';
 
 interface SocialPostBody {
   id: string;

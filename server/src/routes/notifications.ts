@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
-import { requireAdmin } from '../middleware/auth';
+import { requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
 

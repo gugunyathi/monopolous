@@ -1,9 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { User } from '../models/User';
-import { Trade } from '../models/Trade';
-import { TokenLaunch } from '../models/TokenLaunch';
-import { GameSession } from '../models/GameSession';
-import { requireAuth } from '../middleware/auth';
+import { User } from '../models/User.js';
+import { Trade } from '../models/Trade.js';
+import { TokenLaunch } from '../models/TokenLaunch.js';
+import { GameSession } from '../models/GameSession.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 

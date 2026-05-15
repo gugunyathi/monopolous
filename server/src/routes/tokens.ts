@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { TokenLaunch } from '../models/TokenLaunch';
-import { AgentState } from '../models/AgentState';
-import { User } from '../models/User';
-import { requireAuth } from '../middleware/auth';
+import { TokenLaunch } from '../models/TokenLaunch.js';
+import { AgentState } from '../models/AgentState.js';
+import { User } from '../models/User.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 

@@ -1,4 +1,4 @@
-import app, { ensureServerReady } from '../server/src/index';
+import app, { ensureServerReady } from '../server/src/index.js';
 
 export default async function handler(req: Parameters<typeof app>[0], res: Parameters<typeof app>[1]) {
   await ensureServerReady();

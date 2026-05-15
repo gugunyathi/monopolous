@@ -3,9 +3,9 @@ import { createPublicClient, http } from 'viem';
 import { base } from 'viem/chains';
 import { parseSiweMessage } from 'viem/siwe';
 import { v4 as uuidv4 } from 'uuid';
-import { Nonce } from '../models/Nonce';
-import { User } from '../models/User';
-import { signToken, requireAuth } from '../middleware/auth';
+import { Nonce } from '../models/Nonce.js';
+import { User } from '../models/User.js';
+import { signToken, requireAuth } from '../middleware/auth.js';
 
 const viemClient = createPublicClient({ chain: base, transport: http() });
 

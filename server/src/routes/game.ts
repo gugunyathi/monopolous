@@ -1,9 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { GameSession } from '../models/GameSession';
-import { AgentState } from '../models/AgentState';
-import { Trade } from '../models/Trade';
-import { User } from '../models/User';
-import { requireAuth } from '../middleware/auth';
+import { GameSession } from '../models/GameSession.js';
+import { AgentState } from '../models/AgentState.js';
+import { Trade } from '../models/Trade.js';
+import { User } from '../models/User.js';
+import { requireAuth } from '../middleware/auth.js';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
