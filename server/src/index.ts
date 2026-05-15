@@ -12,6 +12,7 @@ import tokensRoutes from './routes/tokens';
 import socialRoutes from './routes/social';
 import gameRoutes from './routes/game';
 import notificationsRoutes from './routes/notifications';
+import adminRoutes from './routes/admin';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -59,6 +60,7 @@ app.use('/api/tokens', tokensRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/game', gameRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/admin', adminRoutes);
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get('/health', (_, res) => {

@@ -3,6 +3,8 @@ import { useStore } from '../store/useStore';
 import { AGENTS } from '../data/agents';
 import { sendBroadcastNotification } from './baseNotificationsService';
 
+const ADMIN_WALLET = (import.meta.env.VITE_ADMIN_WALLET_ADDRESS as string | undefined)?.toLowerCase();
+
 // ── Market Broadcast Templates ────────────────────────────────────────────────
 
 interface BroadcastTemplate {
@@ -123,7 +125,7 @@ function fireBroadcast() {
   const store = useStore.getState();
   store.addBroadcast(broadcast);
 
-  if (store.userAddress) {
+  if (store.userAddress && ADMIN_WALLET && store.userAddress.toLowerCase() === ADMIN_WALLET) {
     void sendBroadcastNotification({
       title: `CEO ${t.category.toUpperCase()}`,
       message: `${t.headline} ${t.detail}`,

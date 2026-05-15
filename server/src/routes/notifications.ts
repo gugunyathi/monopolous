@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
-import { requireAuth } from '../middleware/auth';
+import { requireAdmin } from '../middleware/auth';
 
 const router = Router();
 
@@ -74,6 +74,18 @@ function isDuplicateRequest(payload: { title: string; message: string; targetPat
   return false;
 }
 
+function composeRichMessage(params: {
+  message: string;
+  subtitle?: string;
+  ctaLabel?: string;
+  ctaUrl?: string;
+}): string {
+  const lines: string[] = [params.message];
+  if (params.subtitle) lines.push(params.subtitle);
+  if (params.ctaLabel && params.ctaUrl) lines.push(`${params.ctaLabel}: ${params.ctaUrl}`);
+  return lines.join('\n\n');
+}
+
 async function getUsersPage(cursor?: string): Promise<UsersResponse> {
   const url = new URL(`${BASE_DASHBOARD_NOTIFICATIONS_API}/app/users`);
   url.searchParams.set('app_url', REGISTERED_APP_URL ?? '');
@@ -101,6 +113,23 @@ async function getAudienceAddresses(): Promise<string[]> {
   } while (cursor);
 
   return Array.from(new Set(addresses));
+}
+
+async function getConsentedUsers(): Promise<AppUser[]> {
+  const users: AppUser[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const page = await getUsersPage(cursor);
+    users.push(...page.users);
+    cursor = page.nextCursor;
+  } while (cursor);
+
+  const dedup = new Map<string, AppUser>();
+  for (const user of users) {
+    dedup.set(user.address.toLowerCase(), user);
+  }
+  return Array.from(dedup.values());
 }
 
 router.post('/user-status', async (req: Request, res: Response) => {
@@ -137,7 +166,26 @@ router.post('/user-status', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/send-broadcast', sendLimiter, requireAuth, async (req: Request, res: Response) => {
+router.get('/consented-users', sendLimiter, requireAdmin, async (_req: Request, res: Response) => {
+  if (!isConfigured()) {
+    res.status(503).json({ error: 'Notifications are not configured on the server.' });
+    return;
+  }
+
+  try {
+    const users = await getConsentedUsers();
+    res.json({
+      success: true,
+      fetchedAt: new Date().toISOString(),
+      total: users.length,
+      users,
+    });
+  } catch (error) {
+    res.status(503).json({ error: error instanceof Error ? error.message : 'Notification service unavailable.' });
+  }
+});
+
+router.post('/send-broadcast', sendLimiter, requireAdmin, async (req: Request, res: Response) => {
   if (!isConfigured()) {
     res.status(503).json({ error: 'Notifications are not configured on the server.' });
     return;
@@ -146,6 +194,10 @@ router.post('/send-broadcast', sendLimiter, requireAuth, async (req: Request, re
   const title = req.body?.title as string | undefined;
   const message = req.body?.message as string | undefined;
   const targetPath = req.body?.targetPath as string | undefined;
+  const subtitle = req.body?.subtitle as string | undefined;
+  const ctaLabel = req.body?.ctaLabel as string | undefined;
+  const ctaUrl = req.body?.ctaUrl as string | undefined;
+  const imageUrl = req.body?.imageUrl as string | undefined;
 
   if (!title || !message) {
     res.status(400).json({ error: 'title and message are required.' });
@@ -153,7 +205,7 @@ router.post('/send-broadcast', sendLimiter, requireAuth, async (req: Request, re
   }
 
   const normalizedTitle = clip(title, 30);
-  const normalizedMessage = clip(message, 200);
+  const normalizedMessage = clip(composeRichMessage({ message, subtitle, ctaLabel, ctaUrl }), 200);
   const normalizedTargetPath = normalizeTargetPath(targetPath);
 
   if (isDuplicateRequest({ title: normalizedTitle, message: normalizedMessage, targetPath: normalizedTargetPath })) {
@@ -185,8 +237,20 @@ router.post('/send-broadcast', sendLimiter, requireAuth, async (req: Request, re
       res.status(response.status).json({ error: bodyText || 'Failed to send notification.' });
       return;
     }
-
-    res.type('application/json').send(bodyText);
+    const parsed = bodyText ? JSON.parse(bodyText) as Record<string, unknown> : {};
+    res.json({
+      ...parsed,
+      preview: {
+        title: normalizedTitle,
+        message: normalizedMessage,
+        targetPath: normalizedTargetPath,
+        subtitle: subtitle ? clip(subtitle, 80) : undefined,
+        ctaLabel: ctaLabel ? clip(ctaLabel, 30) : undefined,
+        ctaUrl: ctaUrl ? clip(ctaUrl, 180) : undefined,
+        imageUrl: imageUrl ? clip(imageUrl, 180) : undefined,
+      },
+      audienceCount: walletAddresses.length,
+    });
   } catch (error) {
     res.status(503).json({ error: error instanceof Error ? error.message : 'Notification service unavailable.' });
   }

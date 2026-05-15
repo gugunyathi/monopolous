@@ -16,7 +16,6 @@ import Leaderboard from './Leaderboard';
 import CameraControls from './CameraControls';
 import TokenLaunchesPanel from './TokenLaunchesPanel';
 import { BnkrWalletPanel } from './BnkrWalletPanel';
-import NotificationStatusIndicator from './NotificationStatusIndicator';
 
 const UIOverlay: React.FC = () => {
   const { 
@@ -56,7 +55,6 @@ const UIOverlay: React.FC = () => {
         className="fixed right-3 sm:right-4 md:right-6 flex items-center gap-2 pointer-events-auto z-[130]"
         style={{ top: 'max(env(safe-area-inset-top, 0px) + 12px, 16px)' }}
       >
-        <NotificationStatusIndicator />
         <SignInButton />
       </div>
 

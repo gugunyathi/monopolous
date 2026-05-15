@@ -50,6 +50,10 @@ router.post('/verify', async (req: Request, res: Response) => {
   let parsedNonce: string;
   try {
     const parsed = parseSiweMessage(message);
+    if (!parsed.nonce) {
+      res.status(400).json({ error: 'Missing nonce in SIWE message' });
+      return;
+    }
     parsedNonce = parsed.nonce;
   } catch {
     res.status(400).json({ error: 'Invalid SIWE message format' });

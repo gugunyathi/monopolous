@@ -42,6 +42,33 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   }
 }
 
+function getAdminWalletAddress(): string | null {
+  const admin = process.env.ADMIN_WALLET_ADDRESS ?? process.env.VITE_ADMIN_WALLET_ADDRESS;
+  if (!admin) return null;
+  return admin.toLowerCase();
+}
+
+/**
+ * Strict admin middleware — requires valid JWT and admin wallet ownership.
+ */
+export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+  requireAuth(req, res, () => {
+    const configuredAdmin = getAdminWalletAddress();
+    if (!configuredAdmin) {
+      res.status(503).json({ error: 'ADMIN_WALLET_ADDRESS is not configured on the server' });
+      return;
+    }
+
+    const caller = req.auth?.address?.toLowerCase();
+    if (!caller || caller !== configuredAdmin) {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    next();
+  });
+}
+
 /**
  * Optional middleware — attaches auth payload if JWT is present but doesn't reject.
  */
