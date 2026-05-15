@@ -139,7 +139,7 @@ const AdminPage: React.FC = () => {
   }, [isCorrectWallet]);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4 md:p-8">
+    <div className="min-h-screen overflow-y-auto bg-zinc-950 text-zinc-100 p-4 md:p-8">
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
