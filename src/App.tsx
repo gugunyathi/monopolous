@@ -41,6 +41,8 @@ const App: React.FC = () => {
   useEffect(() => {
     if (isAdminRoute) return;
     if (canvasRef.current && !managerRef.current) {
+      // Guard: clear any stale canvas from a previous Strict Mode run
+      canvasRef.current.querySelectorAll('canvas').forEach(c => c.remove());
       managerRef.current = new SceneManager(canvasRef.current);
     }
     startBroadcastScheduler();

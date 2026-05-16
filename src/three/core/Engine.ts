@@ -31,6 +31,8 @@ export class Engine {
   }
 
   public dispose() {
+    this.renderer.setAnimationLoop(null);
+    this.renderer.domElement.remove();
     this.renderer.dispose();
   }
 }
