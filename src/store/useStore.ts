@@ -29,7 +29,7 @@ export const useStore = create<CharacterState>()(
     isThinking: false,
     aiResponse: "Hello! I'm your AI character. Type something to talk to me.",
     isDebugOpen: false,
-    instanceCount: AGENTS.length + ARC_AGENTS.length,
+    instanceCount: CORE_AGENT_COUNT + ARC_AGENTS.length,
     worldSize: 25,      // radius of Kaldera
 
     // Default Boids Parameters

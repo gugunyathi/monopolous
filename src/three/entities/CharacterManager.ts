@@ -2,21 +2,21 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { BoidsParams, AgentBehavior } from '../../types';
 import { AgentStateBuffer } from '../behavior/AgentStateBuffer';
-import { AGENTS, ARC_AGENTS, ARC_AGENT_START, PLAYER_INDEX } from '../../data/agents';
+import { AGENTS, ARC_AGENTS, ARC_AGENT_START, CORE_AGENT_COUNT, PLAYER_INDEX } from '../../data/agents';
 
 /** Map a 3D scene instance index (0-based) back to its logical agent index. */
 export function sceneIndexToAgentIndex(i: number): number {
-  if (i < AGENTS.length) return i;
-  const arcIdx = i - AGENTS.length;
+  if (i < CORE_AGENT_COUNT) return i;
+  const arcIdx = i - CORE_AGENT_COUNT;
   return arcIdx < ARC_AGENTS.length ? ARC_AGENTS[arcIdx].index : i;
 }
 
 /** Map a logical agent index (possibly 2000+) to a 3D scene instance index. */
 export function agentIndexToSceneIndex(agentIndex: number): number {
-  if (agentIndex < AGENTS.length) return agentIndex;
+  if (agentIndex < CORE_AGENT_COUNT) return agentIndex;
   if (agentIndex >= ARC_AGENT_START) {
     const arcIdx = ARC_AGENTS.findIndex(a => a.index === agentIndex);
-    if (arcIdx !== -1) return AGENTS.length + arcIdx;
+    if (arcIdx !== -1) return CORE_AGENT_COUNT + arcIdx;
   }
   return -1; // not in scene
 }
@@ -404,9 +404,9 @@ export class CharacterManager {
     };
 
     for (let i = 0; i < this.instanceCount; i++) {
-      const agent = i < AGENTS.length
+      const agent = i < CORE_AGENT_COUNT
         ? AGENTS[i]
-        : (ARC_AGENTS[i - AGENTS.length] || AGENTS[0]);
+        : (ARC_AGENTS[i - CORE_AGENT_COUNT] || AGENTS[0]);
       tempColor.set(agent.color);
 
       if (i === PLAYER_INDEX) {
