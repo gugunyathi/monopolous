@@ -23,6 +23,8 @@ import { ARC_AGENTS, ARC_CHAIN_ID, ARC_RPC_BASE, ARC_EXPLORER, ARC_AGENT_COUNT }
 
 // USDC contract address on Arc testnet (same as Base mainnet USDC — Circle CCTP)
 const ARC_USDC_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+const ARC_USDC_DECIMALS = Number((import.meta.env.VITE_ARC_USDC_DECIMALS as string | undefined) ?? '6');
+const ARC_NATIVE_DECIMALS = Number((import.meta.env.VITE_ARC_NATIVE_DECIMALS as string | undefined) ?? '18');
 
 function getRpcKey(): string {
   return (import.meta.env.VITE_ARC_RPC_KEY as string | undefined) ?? '';
@@ -108,27 +110,40 @@ function encodeBalanceOf(address: string): string {
   return `0x70a08231${padded}`;
 }
 
+function parseHexAmount(hex: string | undefined): bigint {
+  if (!hex || hex === '0x') return 0n;
+  return BigInt(hex);
+}
+
+function formatAmount(raw: bigint, decimals: number): string {
+  const safeDecimals = Number.isFinite(decimals) && decimals >= 0 ? Math.floor(decimals) : 18;
+  const base = 10n ** BigInt(safeDecimals);
+  const whole = raw / base;
+  const frac = raw % base;
+  const fracStr = frac.toString().padStart(safeDecimals, '0').slice(0, 2);
+  return `${whole}.${fracStr}`;
+}
+
 async function getUsdcBalance(address: string): Promise<string> {
   const hex = await rpc<string>('eth_call', [
     { to: ARC_USDC_ADDRESS, data: encodeBalanceOf(address) },
     'latest',
   ]);
-  if (!hex || hex === '0x') return '0.00';
-  const raw = BigInt(hex);
-  // USDC has 6 decimals
-  const whole = raw / 1_000_000n;
-  const frac = raw % 1_000_000n;
-  return `${whole}.${frac.toString().padStart(6, '0').slice(0, 2)}`;
+
+  // Some ARC RPC setups return 0x for eth_call against this token address.
+  // In that case, use native balance as the source of truth for displayed USDC.
+  if (!hex || hex === '0x') {
+    return getNativeBalance(address);
+  }
+
+  const raw = parseHexAmount(hex);
+  return formatAmount(raw, ARC_USDC_DECIMALS);
 }
 
 async function getNativeBalance(address: string): Promise<string> {
   const hex = await rpc<string>('eth_getBalance', [address, 'latest']);
-  if (!hex || hex === '0x') return '0.00';
-  // On Arc, native token IS USDC (6 decimals)
-  const raw = BigInt(hex);
-  const whole = raw / 1_000_000n;
-  const frac = raw % 1_000_000n;
-  return `${whole}.${frac.toString().padStart(6, '0').slice(0, 2)}`;
+  const raw = parseHexAmount(hex);
+  return formatAmount(raw, ARC_NATIVE_DECIMALS);
 }
 
 // ─── Network check ────────────────────────────────────────────────────────────

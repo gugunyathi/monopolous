@@ -10,6 +10,13 @@ import {
   ConsentedUsersResponse,
   SendResponse,
 } from '../services/baseNotificationsService';
+import {
+  getArcAutonomyStatus,
+  runArcAutonomyTickNow,
+  startArcAutonomy,
+  stopArcAutonomy,
+  type ArcAutonomyStatus,
+} from '../services/apiService';
 
 type AdminTab = 'notifications' | 'users' | 'system';
 
@@ -29,6 +36,9 @@ const AdminPage: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sendResult, setSendResult] = useState<SendResponse | null>(null);
+  const [autonomy, setAutonomy] = useState<ArcAutonomyStatus | null>(null);
+  const [loadingAutonomy, setLoadingAutonomy] = useState(false);
+  const [updatingAutonomy, setUpdatingAutonomy] = useState(false);
 
   const [title, setTitle] = useState('Monopolous Update');
   const [message, setMessage] = useState('The board just shifted. Check the live game state now.');
@@ -138,10 +148,80 @@ const AdminPage: React.FC = () => {
     }
   }
 
+  async function loadAutonomyStatus() {
+    setLoadingAutonomy(true);
+    setError(null);
+    try {
+      const data = await getArcAutonomyStatus();
+      if (!data) {
+        setError('Admin auth required to view ARC autonomy status.');
+        setAutonomy(null);
+        return;
+      }
+      setAutonomy(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load ARC autonomy status');
+    } finally {
+      setLoadingAutonomy(false);
+    }
+  }
+
+  async function handleStartAutonomy() {
+    setUpdatingAutonomy(true);
+    setError(null);
+    try {
+      const data = await startArcAutonomy();
+      if (!data) {
+        setError('Failed to start ARC autonomy');
+        return;
+      }
+      setAutonomy(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start ARC autonomy');
+    } finally {
+      setUpdatingAutonomy(false);
+    }
+  }
+
+  async function handleStopAutonomy() {
+    setUpdatingAutonomy(true);
+    setError(null);
+    try {
+      const data = await stopArcAutonomy();
+      if (!data) {
+        setError('Failed to stop ARC autonomy');
+        return;
+      }
+      setAutonomy(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to stop ARC autonomy');
+    } finally {
+      setUpdatingAutonomy(false);
+    }
+  }
+
+  async function handleTickNow() {
+    setUpdatingAutonomy(true);
+    setError(null);
+    try {
+      const result = await runArcAutonomyTickNow();
+      if (!result) {
+        setError('Failed to run ARC autonomy tick');
+        return;
+      }
+      setAutonomy(result.autonomy);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to run ARC autonomy tick');
+    } finally {
+      setUpdatingAutonomy(false);
+    }
+  }
+
   useEffect(() => {
     if (!isCorrectWallet) return;
     void loadOverview();
     void loadAudience();
+    void loadAutonomyStatus();
   }, [isCorrectWallet, userAddress]);
 
   // Allow scrolling on admin page (global CSS sets overflow:hidden on html/body/#root)
@@ -318,7 +398,104 @@ const AdminPage: React.FC = () => {
         )}
 
         {tab === 'system' && (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-cyan-300/20 bg-cyan-400/5 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs uppercase tracking-widest text-cyan-200">ARC Autonomy</p>
+                  <p className="mt-1 text-sm text-zinc-300">Backend control plane status, circuit-breaker health, and recent tick history.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    disabled={!isCorrectWallet || loadingAutonomy || updatingAutonomy}
+                    onClick={() => void loadAutonomyStatus()}
+                    className="rounded-lg bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-widest hover:bg-white/20 disabled:opacity-50"
+                  >
+                    {loadingAutonomy ? 'Refreshing...' : 'Refresh'}
+                  </button>
+                  <button
+                    disabled={!isCorrectWallet || updatingAutonomy}
+                    onClick={() => void handleStartAutonomy()}
+                    className="rounded-lg bg-emerald-400 px-3 py-1 text-xs font-bold uppercase tracking-widest text-zinc-900 disabled:opacity-50"
+                  >
+                    Start
+                  </button>
+                  <button
+                    disabled={!isCorrectWallet || updatingAutonomy}
+                    onClick={() => void handleStopAutonomy()}
+                    className="rounded-lg bg-rose-400 px-3 py-1 text-xs font-bold uppercase tracking-widest text-zinc-900 disabled:opacity-50"
+                  >
+                    Stop
+                  </button>
+                  <button
+                    disabled={!isCorrectWallet || updatingAutonomy}
+                    onClick={() => void handleTickNow()}
+                    className="rounded-lg bg-cyan-400 px-3 py-1 text-xs font-bold uppercase tracking-widest text-zinc-900 disabled:opacity-50"
+                  >
+                    Tick Now
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-4">
+                <div className="rounded-lg border border-white/10 bg-black/30 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-widest text-zinc-500">Scheduler</p>
+                  <p className={`mt-1 text-sm font-black ${autonomy?.running ? 'text-emerald-300' : 'text-zinc-300'}`}>
+                    {autonomy?.running ? 'Running' : 'Stopped'}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/30 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-widest text-zinc-500">Transfer Amount</p>
+                  <p className="mt-1 text-sm font-black text-emerald-300">${autonomy?.transferAmount ?? 0}</p>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/30 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-widest text-zinc-500">Global Cap / Day</p>
+                  <p className="mt-1 text-sm font-black text-cyan-300">${autonomy?.globalMaxUsdcPerDay ?? 0}</p>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/30 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-widest text-zinc-500">Failed Ticks</p>
+                  <p className="mt-1 text-sm font-black text-amber-300">{autonomy?.consecutiveFailures ?? 0}</p>
+                </div>
+              </div>
+
+              {autonomy?.haltedReason && (
+                <div className="mt-3 rounded-lg border border-amber-300/40 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
+                  Circuit breaker halted scheduler: {autonomy.haltedReason}
+                </div>
+              )}
+
+              <div className="mt-4 overflow-auto rounded-lg border border-white/10">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-zinc-900">
+                    <tr>
+                      <th className="px-3 py-2">Time</th>
+                      <th className="px-3 py-2">Submitted</th>
+                      <th className="px-3 py-2">Failed</th>
+                      <th className="px-3 py-2">Global Used / Cap</th>
+                      <th className="px-3 py-2">Recipient Streak</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {autonomy?.tickHistory?.slice(0, 20).map((row) => (
+                      <tr key={row.at} className="border-t border-white/10">
+                        <td className="px-3 py-2">{new Date(row.at).toLocaleTimeString()}</td>
+                        <td className="px-3 py-2 text-emerald-300">{row.summary.submitted}</td>
+                        <td className="px-3 py-2 text-rose-300">{row.summary.failed}</td>
+                        <td className="px-3 py-2 text-cyan-300">${row.summary.globalCapUsed.toFixed(2)} / ${row.summary.globalCapLimit.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-zinc-300">{row.summary.recipientRepeatStreak}{row.summary.recipientRepeatAddress ? ` (${shortAddress(row.summary.recipientRepeatAddress)})` : ''}</td>
+                      </tr>
+                    ))}
+                    {!autonomy?.tickHistory?.length && (
+                      <tr>
+                        <td colSpan={5} className="px-3 py-4 text-zinc-400">No tick history yet.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <p className="text-xs uppercase tracking-widest text-zinc-400">Users</p>
               <p className="mt-2 text-3xl font-black">{overview?.counts.users ?? 0}</p>
@@ -342,6 +519,7 @@ const AdminPage: React.FC = () => {
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <p className="text-xs uppercase tracking-widest text-zinc-400">Generated At</p>
               <p className="mt-2 text-sm font-semibold">{overview?.generatedAt ? new Date(overview.generatedAt).toLocaleString() : 'Not loaded'}</p>
+            </div>
             </div>
           </div>
         )}

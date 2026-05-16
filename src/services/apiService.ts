@@ -263,6 +263,47 @@ export interface ArcExecutionRefreshSummary {
   rpcConfigured: boolean;
 }
 
+export interface ArcAutonomyTickSummary {
+  tickStartedAt: number;
+  tickFinishedAt: number;
+  attempted: number;
+  submitted: number;
+  skipped: number;
+  failed: number;
+  globalCapUsed: number;
+  globalCapLimit: number;
+  recipientRepeatStreak: number;
+  recipientRepeatAddress?: string;
+  confirmationsRefreshed: number;
+  confirmed: number;
+  pending: number;
+  failedConfirmations: number;
+  dryRun: boolean;
+}
+
+export interface ArcAutonomyTickRecord {
+  at: number;
+  summary: ArcAutonomyTickSummary;
+}
+
+export interface ArcAutonomyStatus {
+  enabled: boolean;
+  running: boolean;
+  intervalMs: number;
+  maxActionsPerTick: number;
+  transferAmount: number;
+  globalMaxUsdcPerDay: number;
+  circuitBreakerFailedTicks: number;
+  recipientRepeatLimit: number;
+  dryRun: boolean;
+  tickInFlight: boolean;
+  lastTickAt: number | null;
+  consecutiveFailures: number;
+  haltedReason: string | null;
+  tickHistory: ArcAutonomyTickRecord[];
+  lastSummary: ArcAutonomyTickSummary | null;
+}
+
 // ─── Users ────────────────────────────────────────────────────────────────────
 
 export async function getUser(address: string): Promise<UserProfile | null> {
@@ -601,6 +642,39 @@ export async function refreshArcExecutionConfirmations(limit = 20): Promise<ArcE
     body: JSON.stringify({ limit }),
   }, true);
   return data?.refresh ?? null;
+}
+
+export async function getArcAutonomyStatus(): Promise<ArcAutonomyStatus | null> {
+  const { data } = await apiFetch<{ success: boolean; autonomy: ArcAutonomyStatus }>('/arc/autonomy/status', {}, true);
+  return data?.autonomy ?? null;
+}
+
+export async function startArcAutonomy(): Promise<ArcAutonomyStatus | null> {
+  const { data } = await apiFetch<{ success: boolean; autonomy: ArcAutonomyStatus }>(
+    '/arc/autonomy/start',
+    { method: 'POST' },
+    true,
+  );
+  return data?.autonomy ?? null;
+}
+
+export async function stopArcAutonomy(): Promise<ArcAutonomyStatus | null> {
+  const { data } = await apiFetch<{ success: boolean; autonomy: ArcAutonomyStatus }>(
+    '/arc/autonomy/stop',
+    { method: 'POST' },
+    true,
+  );
+  return data?.autonomy ?? null;
+}
+
+export async function runArcAutonomyTickNow(): Promise<{ result: ArcAutonomyTickSummary; autonomy: ArcAutonomyStatus } | null> {
+  const { data } = await apiFetch<{ success: boolean; result: ArcAutonomyTickSummary; autonomy: ArcAutonomyStatus }>(
+    '/arc/autonomy/tick',
+    { method: 'POST' },
+    true,
+  );
+  if (!data) return null;
+  return { result: data.result, autonomy: data.autonomy };
 }
 
 // ─── Sign-In with Base Wallet ─────────────────────────────────────────────────

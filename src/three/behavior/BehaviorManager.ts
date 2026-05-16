@@ -240,6 +240,7 @@ export class BehaviorManager {
       this.currentEncounterNPC = nearestNPC;
       if (nearestNPC !== null) {
         const agent = this.agents[nearestNPC];
+        if (!agent) { this.onEncounterChange(null); return; }
         this.onEncounterChange({
           npcIndex: nearestNPC,
           npcDepartment: agent.department,

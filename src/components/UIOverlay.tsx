@@ -6,7 +6,7 @@ import HelpModal from './HelpModal';
 import ChatPanel from './ChatPanel';
 import SignInButton from './SignInButton';
 import AboutPage from './AboutPage';
-import { AGENTS } from '../data/agents';
+import { AGENTS, ARC_AGENTS } from '../data/agents';
 import { LayoutGrid, Users, Play, Info, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -18,6 +18,11 @@ import TokenLaunchesPanel from './TokenLaunchesPanel';
 import { BnkrWalletPanel } from './BnkrWalletPanel';
 import { ArcAgentsPanel } from './ArcAgentsPanel';
 import NotificationDeepLinkCard from './NotificationDeepLinkCard';
+
+function getAgentByIndex(agentIndex: number) {
+  if (agentIndex >= 0 && agentIndex < AGENTS.length) return AGENTS[agentIndex];
+  return ARC_AGENTS.find((a) => a.index === agentIndex);
+}
 
 const UIOverlay: React.FC = () => {
   const { 
@@ -108,7 +113,7 @@ const UIOverlay: React.FC = () => {
             >
               <div className="w-2 h-2 bg-white rounded-full animate-ping" />
               <span className="text-[10px] font-black text-white uppercase tracking-widest">
-                {AGENTS[socialFeed[0].agentIndex].role} is LIVE
+                {(getAgentByIndex(socialFeed[0].agentIndex)?.role ?? `Agent ${socialFeed[0].agentIndex}`)} is LIVE
               </span>
               <div className="bg-white/20 px-2 py-0.5 rounded text-[8px] font-bold text-white uppercase">Join</div>
             </button>

@@ -1,7 +1,7 @@
 
 import { create } from 'zustand';
 import { CharacterState, AnimationName, PerformanceStats, BoidsParams, ActiveEncounter, Broadcast, SocialPost, PolymarketMarket, PolymarketActiveBet } from '../types';
-import { AGENTS, CORE_AGENT_COUNT } from '../data/agents';
+import { AGENTS, ARC_AGENTS, CORE_AGENT_COUNT } from '../data/agents';
 import {
   recordTrade,
   recordTokenLaunch,
@@ -29,7 +29,7 @@ export const useStore = create<CharacterState>()(
     isThinking: false,
     aiResponse: "Hello! I'm your AI character. Type something to talk to me.",
     isDebugOpen: false,
-    instanceCount: 100,
+    instanceCount: AGENTS.length + ARC_AGENTS.length,
     worldSize: 25,      // radius of Kaldera
 
     // Default Boids Parameters

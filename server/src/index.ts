@@ -14,6 +14,7 @@ import gameRoutes from './routes/game.js';
 import notificationsRoutes from './routes/notifications.js';
 import adminRoutes from './routes/admin.js';
 import arcRoutes from './routes/arc.js';
+import { startArcAutonomyScheduler, stopArcAutonomyScheduler } from './services/arcAutonomyService.js';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -99,6 +100,7 @@ export default app;
 async function start() {
   try {
     await ensureServerReady();
+    startArcAutonomyScheduler();
     app.listen(PORT, () => {
       console.log(`[Monopolous API] Running on port ${PORT}`);
       console.log(`[Monopolous API] CORS allowed origins: ${allowedOrigins.join(', ')}`);
@@ -112,3 +114,11 @@ async function start() {
 if (process.env.VERCEL !== '1') {
   start();
 }
+
+process.on('SIGINT', () => {
+  stopArcAutonomyScheduler();
+});
+
+process.on('SIGTERM', () => {
+  stopArcAutonomyScheduler();
+});

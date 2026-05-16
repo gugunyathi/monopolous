@@ -1,13 +1,44 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store/useStore';
-import { AGENTS, CORE_AGENT_COUNT } from '../data/agents';
+import { AGENTS, ARC_AGENTS } from '../data/agents';
+import { getAllArcAgentWallets, isArcConfigured, provisionArcAgents } from '../services/arcWalletService';
 import { Heart, MessageCircle, Share2, UserPlus, UserCheck, TrendingUp, TrendingDown, X, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+
+function getAgentByIndex(agentIndex: number) {
+  if (agentIndex >= 0 && agentIndex < AGENTS.length) return AGENTS[agentIndex];
+  return ARC_AGENTS.find((a) => a.index === agentIndex);
+}
 
 const SocialFeed: React.FC = () => {
   const { socialFeed, viewMode, setActiveSocialAgentIndex, agentBalances } = useStore();
   const containerRef = useRef<HTMLDivElement>(null);
+  const [arcBalances, setArcBalances] = useState<Record<number, number>>({});
+
+  useEffect(() => {
+    if (viewMode !== 'social' || !isArcConfigured()) return;
+
+    const syncArcBalances = async () => {
+      try {
+        await provisionArcAgents();
+        const next: Record<number, number> = {};
+        for (const wallet of getAllArcAgentWallets()) {
+          next[wallet.agentIndex] = Number.parseFloat(wallet.usdcBalance) || 0;
+        }
+        setArcBalances(next);
+      } catch {
+        // Keep UI resilient if Arc RPC is temporarily unavailable.
+      }
+    };
+
+    void syncArcBalances();
+    const timer = setInterval(() => {
+      void syncArcBalances();
+    }, 20000);
+
+    return () => clearInterval(timer);
+  }, [viewMode]);
 
   useEffect(() => {
     if (viewMode !== 'social') {
@@ -50,18 +81,23 @@ const SocialFeed: React.FC = () => {
         </div>
       ) : (
         socialFeed
-          .filter((post) => post.agentIndex < CORE_AGENT_COUNT)
           .map((post) => (
-            <SocialPost key={post.id} post={post} />
+            <SocialPost key={post.id} post={post} arcBalances={arcBalances} />
           ))
       )}
     </div>
   );
 };
 
-const SocialPost: React.FC<{ post: any }> = ({ post }) => {
+const SocialPost: React.FC<{ post: any; arcBalances: Record<number, number> }> = ({ post, arcBalances }) => {
   const { following, toggleFollow, likePost, agentBalances } = useStore();
-  const agent = AGENTS[post.agentIndex];
+  const agent = getAgentByIndex(post.agentIndex);
+  if (!agent) return null;
+
+  const displayBalance = agent.wallet.chain === 'arc-testnet'
+    ? (arcBalances[post.agentIndex] ?? agent.wallet.balance)
+    : (agentBalances[post.agentIndex] || agent.wallet.balance);
+
   const isFollowing = following.has(post.agentIndex);
   const [showComments, setShowComments] = useState(false);
 
@@ -196,7 +232,7 @@ const SocialPost: React.FC<{ post: any }> = ({ post }) => {
             </div>
             <div className="flex items-center gap-2">
               <p className="text-zinc-400 text-[10px] md:text-xs font-medium">{agent.department}</p>
-              <span className="text-emerald-400 text-[9px] md:text-[10px] font-black">Balance: ${(agentBalances[post.agentIndex] || agent.wallet.balance).toLocaleString()}</span>
+              <span className="text-emerald-400 text-[9px] md:text-[10px] font-black">Balance: ${displayBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
             </div>
             <code className="text-[8px] font-mono text-blue-300/60">
               {agent.wallet.address.slice(0, 6)}…{agent.wallet.address.slice(-4)}
@@ -275,7 +311,8 @@ const SocialPost: React.FC<{ post: any }> = ({ post }) => {
                 <p className="text-white/30 text-xs text-center py-8 font-bold uppercase tracking-widest">No comments yet</p>
               ) : (
                 post.comments.map((comment: any) => {
-                  const commenter = AGENTS[comment.agentIndex];
+                  const commenter = getAgentByIndex(comment.agentIndex);
+                  if (!commenter) return null;
                   return (
                     <div key={comment.id} className="flex items-start gap-3">
                       <div

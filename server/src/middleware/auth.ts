@@ -7,6 +7,14 @@ export interface AuthPayload {
   exp?: number;
 }
 
+function getArcWorkerToken(): string {
+  const token = process.env.ARC_WORKER_TOKEN;
+  if (!token) {
+    throw new Error('ARC_WORKER_TOKEN environment variable is not set');
+  }
+  return token;
+}
+
 // Extend Express Request to carry the decoded auth payload
 declare global {
   namespace Express {
@@ -67,6 +75,26 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
 
     next();
   });
+}
+
+/**
+ * Internal worker middleware for ARC autonomy tick endpoints.
+ * Uses a shared token and is intended for private service-to-service calls.
+ */
+export function requireArcWorker(req: Request, res: Response, next: NextFunction): void {
+  const headerToken = req.headers['x-arc-worker-token'];
+  const provided = typeof headerToken === 'string' ? headerToken : '';
+
+  try {
+    const expected = getArcWorkerToken();
+    if (!provided || provided !== expected) {
+      res.status(401).json({ error: 'Invalid ARC worker token' });
+      return;
+    }
+    next();
+  } catch (error) {
+    res.status(503).json({ error: error instanceof Error ? error.message : 'ARC worker auth unavailable' });
+  }
 }
 
 /**

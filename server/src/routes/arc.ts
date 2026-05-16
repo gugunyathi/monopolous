@@ -1,5 +1,5 @@
 import { Request, Response, Router } from 'express';
-import { requireAdmin } from '../middleware/auth.js';
+import { requireAdmin, requireArcWorker } from '../middleware/auth.js';
 import { ArcExecution } from '../models/ArcExecution.js';
 import {
   executeArcTransfer,
@@ -9,6 +9,12 @@ import {
   refreshArcExecutionConfirmations,
   updateArcPolicy,
 } from '../services/arcExecutor.js';
+import {
+  getArcAutonomyStatus,
+  runArcAutonomyTick,
+  startArcAutonomyScheduler,
+  stopArcAutonomyScheduler,
+} from '../services/arcAutonomyService.js';
 import { WebhookService } from '../services/webhookService.js';
 
 const router = Router();
@@ -45,6 +51,38 @@ router.post('/executions/refresh', requireAdmin, async (req: Request, res: Respo
   const limit = Math.min(Math.max(parseInt(String(req.body?.limit ?? '20'), 10), 1), 100);
   const refresh = await refreshArcExecutionConfirmations(limit);
   res.json({ success: true, refresh });
+});
+
+router.get('/autonomy/status', requireAdmin, async (_req: Request, res: Response) => {
+  res.json({ success: true, autonomy: getArcAutonomyStatus() });
+});
+
+router.post('/autonomy/start', requireAdmin, async (_req: Request, res: Response) => {
+  startArcAutonomyScheduler();
+  res.json({ success: true, autonomy: getArcAutonomyStatus() });
+});
+
+router.post('/autonomy/stop', requireAdmin, async (_req: Request, res: Response) => {
+  stopArcAutonomyScheduler();
+  res.json({ success: true, autonomy: getArcAutonomyStatus() });
+});
+
+router.post('/autonomy/tick', requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const result = await runArcAutonomyTick();
+    res.json({ success: true, result, autonomy: getArcAutonomyStatus() });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'ARC autonomy tick failed' });
+  }
+});
+
+router.post('/autonomy/tick/internal', requireArcWorker, async (_req: Request, res: Response) => {
+  try {
+    const result = await runArcAutonomyTick();
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'ARC autonomy tick failed' });
+  }
 });
 
 router.get('/policies', requireAdmin, async (_req: Request, res: Response) => {

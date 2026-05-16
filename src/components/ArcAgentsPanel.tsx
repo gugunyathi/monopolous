@@ -238,6 +238,7 @@ export function ArcAgentsPanel() {
 
   // ── Expanded panel ────────────────────────────────────────────────────────
   return (
+      <>
     <div
       className="flex flex-col rounded-2xl border border-white/10 bg-black/80 backdrop-blur text-white"
       style={{ width: 340, maxHeight: 520, pointerEvents: 'auto' }}

@@ -15,6 +15,8 @@ import { startADKOrchestrator, stopADKOrchestrator } from './services/adk/orches
 import { startPolymarketFeed, stopPolymarketFeed } from './services/polymarketService';
 import { useStore } from './store/useStore';
 
+const ENABLE_CLIENT_ADK = (import.meta.env.VITE_ENABLE_CLIENT_ADK ?? 'false').toLowerCase() === 'true';
+
 const App: React.FC = () => {
   const pathname = window.location.pathname.toLowerCase().replace(/\/+$/, '') || '/';
   const isAdminRoute = pathname === '/admin';
@@ -44,7 +46,9 @@ const App: React.FC = () => {
     startBroadcastScheduler();
     startPostScheduler();
     startWalletSimulator();
-    startADKOrchestrator();
+    if (ENABLE_CLIENT_ADK) {
+      startADKOrchestrator();
+    }
     startPolymarketFeed((markets) => useStore.getState().setPolymarketData(markets));
 
     return () => {
@@ -55,7 +59,9 @@ const App: React.FC = () => {
       stopBroadcastScheduler();
       stopPostScheduler();
       stopWalletSimulator();
-      stopADKOrchestrator();
+      if (ENABLE_CLIENT_ADK) {
+        stopADKOrchestrator();
+      }
       stopPolymarketFeed();
     };
   }, [isAdminRoute]);

@@ -5,7 +5,8 @@ import { CharacterManager } from './entities/CharacterManager';
 import { Board } from './entities/Board';
 import { InputManager } from './input/InputManager';
 import { BehaviorManager } from './behavior/BehaviorManager';
-import { AGENTS, PLAYER_INDEX } from '../data/agents';
+import { AGENTS, ARC_AGENTS, ARC_AGENT_START, PLAYER_INDEX } from '../data/agents';
+import { agentIndexToSceneIndex } from './entities/CharacterManager';
 import { useStore } from '../store/useStore';
 import { AgentBehavior, ChatMessage } from '../types';
 import { geminiService } from '../services/geminiService';
@@ -67,7 +68,7 @@ export class SceneManager {
     if (stateBuffer) {
       this.behaviorManager = new BehaviorManager(
         stateBuffer,
-        AGENTS,
+        [...AGENTS, ...ARC_AGENTS],
         (encounter) => useStore.getState().setActiveEncounter(encounter),
       );
       console.log('[SceneManager] BehaviorManager created — NPC count:', stateBuffer.count);
@@ -122,7 +123,8 @@ export class SceneManager {
           });
 
           // Auto-presentation
-          const agent = AGENTS[index];
+          const agent = index < AGENTS.length ? AGENTS[index] : ARC_AGENTS[index - AGENTS.length];
+          if (!agent) { useStore.setState({ isThinking: false }); return; }
           try {
             const systemInstruction = `You are ${agent.role} at FakeClaw Inc. 
 Department: ${agent.department}
@@ -169,7 +171,9 @@ Keep your responses extremely brief (1-2 short sentences max) and professional. 
         const state = useStore.getState();
         if (state.selectedNpcIndex === null || state.isThinking) return;
 
-        const agent = AGENTS[state.selectedNpcIndex];
+        const npcIdx = state.selectedNpcIndex;
+        const agent = npcIdx < AGENTS.length ? AGENTS[npcIdx] : ARC_AGENTS[npcIdx - AGENTS.length];
+        if (!agent) return;
         const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
         const userMessage: ChatMessage = {
@@ -390,9 +394,29 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
     
     let followIdx = this.selectedIndex ?? PLAYER_INDEX;
     
-    // Override follow index if in social mode
-    if (viewMode === 'social' && activeSocialAgentIndex !== null) {
-      followIdx = activeSocialAgentIndex;
+    // In Live/social mode: prefer following ARC or BNKR agents with wallets
+    if (viewMode === 'social') {
+      const { bnkrWallets } = useStore.getState();
+      if (activeSocialAgentIndex !== null) {
+        // Map ARC agents (2000+) to their 3D scene instance index
+        if (activeSocialAgentIndex >= ARC_AGENT_START) {
+          const sceneIdx = agentIndexToSceneIndex(activeSocialAgentIndex);
+          followIdx = sceneIdx >= 0 ? sceneIdx : PLAYER_INDEX;
+        } else {
+          // For regular agents: if the current post is from a BNKR agent, follow it;
+          // otherwise snap camera to a BNKR agent if any are configured
+          const isBnkr = bnkrWallets.some(w => w.agentIndex === activeSocialAgentIndex);
+          if (isBnkr) {
+            followIdx = activeSocialAgentIndex;
+          } else if (bnkrWallets.length > 0) {
+            // Cycle through BNKR agents slowly so camera drifts between them
+            const cycleIdx = Math.floor(Date.now() / 8000) % bnkrWallets.length;
+            followIdx = bnkrWallets[cycleIdx].agentIndex;
+          } else {
+            followIdx = activeSocialAgentIndex;
+          }
+        }
+      }
     }
 
     const pos = this.characters.getCPUPosition(followIdx);
@@ -472,7 +496,10 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
       this.liveDot.visible = showMarker;
 
       if (showMarker && activeSocialAgentIndex !== null) {
-        const agentPos = this.characters.getCPUPosition(activeSocialAgentIndex);
+        const sceneIdx = activeSocialAgentIndex >= ARC_AGENT_START
+          ? agentIndexToSceneIndex(activeSocialAgentIndex)
+          : activeSocialAgentIndex;
+        const agentPos = sceneIdx >= 0 ? this.characters.getCPUPosition(sceneIdx) : null;
         if (agentPos) {
           const y = 0.08;
           // Outer ring: pulse scale 1.0 → 1.8 with a sine wave
@@ -532,7 +559,7 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
     if (this.socialTimer > 8) {
       this.socialTimer = 0;
       
-      const count = this.characters.getCount();
+      const count = AGENTS.length; // Social simulation only for core agents
       const randomIdx = Math.floor(Math.random() * (count - 1)) + 1;
       const agent = AGENTS[randomIdx];
       
@@ -583,7 +610,7 @@ Include 2-3 relevant emojis. Be professional but "social media" savvy.`;
         
         // Occasionally add a comment from another agent
         setTimeout(() => {
-          const commenterIdx = Math.floor(Math.random() * (count - 1)) + 1;
+          const commenterIdx = Math.floor(Math.random() * (AGENTS.length - 1)) + 1;
           const commenter = AGENTS[commenterIdx];
           useStore.getState().addComment(post.id, {
             id: Math.random().toString(36).substr(2, 9),

@@ -1,0 +1,12 @@
+What’s next (recommended)
+
+Run a controlled live validation
+In admin UI, go to System tab and press Tick Now once.
+Confirm a new ARC execution appears and confirmation progresses.
+Tighten recipient safety for testnet-to-prod transition
+Populate allowlistedToAddresses per ARC agent policy before raising limits.
+Add alerting on circuit-breaker halt
+Send webhook/notification when haltedReason is set so ops sees failures immediately.
+Clean up noisy mon
+
+Replace deprecated new option in findOneAndUpdate calls to reduce log noise and improve operational clarity.

@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { AGENTS } from '../data/agents';
+import { AGENTS, ARC_AGENTS } from '../data/agents';
+import { getAllArcAgentWallets, isArcConfigured, provisionArcAgents } from '../services/arcWalletService';
 import { Trophy, Wallet, ChevronUp, ChevronDown, Zap, X, Check, Copy, LogIn, TrendingUp, TrendingDown, Target, Flame, BarChart2, Package } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BasePayButton } from '@base-org/account-ui/react';
@@ -67,6 +68,7 @@ const PRESET_AMOUNTS = [1, 5, 10, 50];
 
 const Leaderboard: React.FC = () => {
   const { leaderboard, agentBalances, viewMode, updateBalance, updateLeaderboard, userAddress, setUserAddress } = useStore();
+  const [arcBalances, setArcBalances] = useState<Record<number, number>>({});
   // Collapse by default on mobile screens to avoid blocking the 3D world
   const [collapsed, setCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [fundingIndex, setFundingIndex] = useState<number | null>(null);
@@ -75,6 +77,30 @@ const Leaderboard: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [copied, setCopied] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
+
+  React.useEffect(() => {
+    if (viewMode !== 'world' || !isArcConfigured()) return;
+
+    const syncArcBalances = async () => {
+      try {
+        await provisionArcAgents();
+        const next: Record<number, number> = {};
+        for (const wallet of getAllArcAgentWallets()) {
+          next[wallet.agentIndex] = Number.parseFloat(wallet.usdcBalance) || 0;
+        }
+        setArcBalances(next);
+      } catch {
+        // Keep world tab responsive even if ARC RPC is unavailable.
+      }
+    };
+
+    void syncArcBalances();
+    const timer = setInterval(() => {
+      void syncArcBalances();
+    }, 20000);
+
+    return () => clearInterval(timer);
+  }, [viewMode]);
 
   if (viewMode !== 'world') return null;
 
@@ -160,6 +186,7 @@ const Leaderboard: React.FC = () => {
               <div className="px-3 md:px-4 pb-3 md:pb-4 space-y-2 md:space-y-3 overflow-y-auto max-h-[50vh]">
                 {leaderboard.map((entry, i) => {
                   const agent = AGENTS[entry.agentIndex];
+                  if (!agent) return null;
                   const startBal = agent.wallet.balance;
                   const pnl = entry.netWorth - startBal;
                   const pnlPct = ((pnl / startBal) * 100).toFixed(1);
@@ -203,6 +230,39 @@ const Leaderboard: React.FC = () => {
                     </button>
                   );
                 })}
+
+                <div className="pt-2 border-t border-white/10">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-cyan-300 mb-2">ARC Agents (On-chain)</p>
+                  <div className="space-y-2">
+                    {ARC_AGENTS.map((agent) => {
+                      const bal = arcBalances[agent.index] ?? agent.wallet.balance;
+                      return (
+                        <div
+                          key={agent.index}
+                          className="w-full flex items-center justify-between rounded-xl px-2 py-1.5 -mx-2 bg-cyan-500/5 border border-cyan-400/10"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div
+                              className="w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-black text-white border border-white/10 shrink-0"
+                              style={{ backgroundColor: agent.color }}
+                            >
+                              {agent.role[0]}
+                            </div>
+                            <div className="text-left min-w-0">
+                              <p className="text-white text-[9px] md:text-[10px] font-bold truncate w-20 md:w-24">{agent.role}</p>
+                              <p className="text-cyan-300/70 text-[7px] md:text-[8px] uppercase tracking-widest truncate">ARC Protocol</p>
+                              <p className="text-cyan-400/60 text-[6px] md:text-[7px] font-mono">{agent.wallet.address.slice(0, 6)}…{agent.wallet.address.slice(-4)}</p>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-cyan-300 text-[9px] md:text-[10px] font-black">${bal.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                            <p className="text-[7px] md:text-[8px] text-cyan-500/70 font-bold uppercase tracking-widest">USDC</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               <div className="px-3 md:px-4 pb-3 md:pb-4 pt-0 border-t border-white/10">
