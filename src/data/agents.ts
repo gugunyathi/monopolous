@@ -34,8 +34,8 @@ export interface AgentWallet {
 export const ARC_CHAIN_ID = 5042002;
 export const ARC_RPC_BASE = 'https://rpc.testnet.arc-node.thecanteenapp.com/v1';
 export const ARC_EXPLORER = 'https://testnet.arcscan.app';
-export const ARC_AGENT_START = 2000;   // Indices 2000–2009 are ARC agents
-export const ARC_AGENT_COUNT = 10;
+export const ARC_AGENT_START = 2000;   // Indices 2000–2004 are ARC agents (real wallets only)
+export const ARC_AGENT_COUNT = 5;
 
 export interface AgentData {
   index: number;
@@ -596,7 +596,8 @@ function parseArcWalletOverrides(): string[] {
 
 const ARC_WALLET_OVERRIDES = parseArcWalletOverrides();
 
-const _arcAgents: AgentData[] = ARC_ROLES.map((r, i) => ({
+// Only create ARC agents for indices that have a real wallet override
+const _arcAgents: AgentData[] = ARC_ROLES.slice(0, ARC_WALLET_OVERRIDES.length).map((r, i) => ({
   index: ARC_AGENT_START + i,
   department: 'ARC Protocol',
   role: r.role,
