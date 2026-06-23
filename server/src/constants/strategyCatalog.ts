@@ -25,6 +25,19 @@ export const ALL_STRATEGY_IDS: TradingStrategyId[] = [
 
 export const DEFAULT_STRATEGY_ID: TradingStrategyId = 'two_sigma_risk';
 
+const STRATEGY_LABELS: Record<TradingStrategyId, string> = {
+  gs_quant_arch: 'Goldman Quantitative Architect',
+  rentech_backtest: 'Renaissance Backtesting Engine',
+  two_sigma_risk: 'Two Sigma Risk Framework',
+  citadel_alpha: 'Citadel Alpha Research',
+  jane_street_mm: 'Jane Street Market Making',
+  aqr_factor: 'AQR Factor Builder',
+  de_shaw_stat_arb: 'D.E. Shaw Stat Arb',
+  bridgewater_macro: 'Bridgewater Macro Regimes',
+  bloomberg_data: 'Bloomberg Data Pipeline',
+  virtu_execution: 'Virtu Execution Algorithms',
+};
+
 const EXECUTION_MULTIPLIER: Record<TradingStrategyId, number> = {
   gs_quant_arch: 0.9,
   rentech_backtest: 0.65,
@@ -47,4 +60,12 @@ export function getExecutionMultiplier(strategyId?: string | null): number {
     return EXECUTION_MULTIPLIER[DEFAULT_STRATEGY_ID];
   }
   return EXECUTION_MULTIPLIER[strategyId];
+}
+
+export function getStrategySummaries() {
+  return ALL_STRATEGY_IDS.map((id) => ({
+    id,
+    label: STRATEGY_LABELS[id],
+    executionMultiplier: EXECUTION_MULTIPLIER[id],
+  }));
 }

@@ -16,6 +16,7 @@ import {
   stopArcAutonomyScheduler,
 } from '../services/arcAutonomyService.js';
 import { WebhookService } from '../services/webhookService.js';
+import { getStrategySummaries } from '../constants/strategyCatalog.js';
 
 const router = Router();
 
@@ -88,6 +89,10 @@ router.post('/autonomy/tick/internal', requireArcWorker, async (_req: Request, r
 router.get('/policies', requireAdmin, async (_req: Request, res: Response) => {
   const policies = await listArcPolicies();
   res.json({ success: true, policies });
+});
+
+router.get('/strategies', requireAdmin, async (_req: Request, res: Response) => {
+  res.json({ success: true, strategies: getStrategySummaries() });
 });
 
 router.patch('/policies/:agentIndex', requireAdmin, async (req: Request, res: Response) => {

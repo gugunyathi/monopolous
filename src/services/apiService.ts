@@ -233,6 +233,12 @@ export interface ArcPolicyRecord {
   updatedAt: string;
 }
 
+export interface ArcStrategyOption {
+  id: string;
+  label: string;
+  executionMultiplier: number;
+}
+
 export interface ArcExecutionRecord {
   _id: string;
   agentIndex: number;
@@ -576,6 +582,11 @@ export async function getArcStatus(): Promise<{
 export async function getArcPolicies(): Promise<ArcPolicyRecord[]> {
   const { data } = await apiFetch<{ success: boolean; policies: ArcPolicyRecord[] }>('/arc/policies', {}, true);
   return data?.policies ?? [];
+}
+
+export async function getArcStrategies(): Promise<ArcStrategyOption[]> {
+  const { data } = await apiFetch<{ success: boolean; strategies: ArcStrategyOption[] }>('/arc/strategies', {}, true);
+  return data?.strategies ?? [];
 }
 
 export async function updateArcPolicy(agentIndex: number, updates: {

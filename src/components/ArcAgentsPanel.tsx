@@ -26,10 +26,12 @@ import {
 import {
   getArcExecutions,
   getArcPolicies,
+  getArcStrategies,
   updateArcPolicy,
   type ArcExecutionRecord,
   type ArcPolicyRecord,
   type ArcExecutionRefreshSummary,
+  type ArcStrategyOption,
 } from '../services/apiService';
 import { ConfirmationQueue } from '../services/confirmationQueue';
 import { PolicyEditor } from './PolicyEditor';
@@ -75,6 +77,7 @@ export function ArcAgentsPanel() {
   const [showSetup, setShowSetup] = useState(false);
   const [executions, setExecutions] = useState<ArcExecutionRecord[]>([]);
   const [policies, setPolicies] = useState<ArcPolicyRecord[]>([]);
+  const [strategyOptions, setStrategyOptions] = useState<ArcStrategyOption[]>([]);
   const [journalError, setJournalError] = useState<string | null>(null);
   const [lastRefreshSummary, setLastRefreshSummary] = useState<ArcExecutionRefreshSummary | null>(null);
   
@@ -90,12 +93,14 @@ export function ArcAgentsPanel() {
   const configured = isArcConfigured();
 
   const refreshJournal = useCallback(async (withRefreshPoll: boolean) => {
-    const [execResult, policyResult] = await Promise.all([
+    const [execResult, policyResult, strategyResult] = await Promise.all([
       getArcExecutions(30, withRefreshPoll),
       getArcPolicies(),
+      getArcStrategies(),
     ]);
     setExecutions(execResult.executions);
     setPolicies(policyResult);
+    setStrategyOptions(strategyResult);
     setLastRefreshSummary(execResult.refresh ?? null);
     setJournalError(null);
     
@@ -492,6 +497,7 @@ export function ArcAgentsPanel() {
     {editingPolicy && (
       <PolicyEditor
         policy={editingPolicy}
+        strategyOptions={strategyOptions}
         onSave={handleSavePolicy}
         onCancel={() => {
           setEditingPolicy(null);

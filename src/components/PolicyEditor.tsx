@@ -7,11 +7,12 @@
 
 import { useState } from 'react';
 import { ARC_AGENTS } from '../data/agents';
-import { type ArcPolicyRecord } from '../services/apiService';
+import { type ArcPolicyRecord, type ArcStrategyOption } from '../services/apiService';
 import { DEFAULT_STRATEGY_ID, getStrategyOptions, getTradingStrategyById } from '../constants/tradingStrategies';
 
 interface PolicyEditorProps {
   policy: ArcPolicyRecord;
+  strategyOptions?: ArcStrategyOption[];
   onSave: (updates: {
     enabled?: boolean;
     selectedStrategyId?: string;
@@ -26,8 +27,12 @@ interface PolicyEditorProps {
   isSaving?: boolean;
 }
 
-export function PolicyEditor({ policy, onSave, onCancel, isSaving }: PolicyEditorProps) {
+export function PolicyEditor({ policy, strategyOptions, onSave, onCancel, isSaving }: PolicyEditorProps) {
   const arcAgent = ARC_AGENTS.find((a) => a.index === policy.agentIndex);
+  const effectiveStrategyOptions =
+    strategyOptions && strategyOptions.length > 0
+      ? strategyOptions.map((option) => ({ id: option.id, label: option.label }))
+      : getStrategyOptions();
 
   // Local state for editing
   const [enabled, setEnabled] = useState(policy.enabled);
@@ -192,7 +197,7 @@ export function PolicyEditor({ policy, onSave, onCancel, isSaving }: PolicyEdito
               disabled={isSaving || !enabled}
               className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs text-white placeholder-zinc-600 focus:border-cyan-500 focus:outline-none disabled:opacity-50"
             >
-              {getStrategyOptions().map((option) => (
+              {effectiveStrategyOptions.map((option) => (
                 <option key={option.id} value={option.id} className="bg-zinc-900 text-white">
                   {option.label}
                 </option>
