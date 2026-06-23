@@ -17,6 +17,7 @@ import { GoogleGenAI } from '@google/genai';
 import { AGENTS, ARC_AGENTS, CORE_AGENT_COUNT } from '../../data/agents';
 import { useStore } from '../../store/useStore';
 import { WALLET_TOOL_DECLARATIONS, BANKR_TOOL_DECLARATIONS, BNKR_WALLET_TOOL_DECLARATIONS, POLYMARKET_TOOL_DECLARATIONS, executeTool, executeArcTool, executeBankrTool, executeBnkrWalletTool, executePolymarketTool } from './tools';
+import { getTradingStrategyById } from '../../constants/tradingStrategies';
 import { isBankrBotAvailable } from '../bankrBotService';
 import { getLaunchedTokens } from '../tokenLaunchService';
 import {
@@ -72,6 +73,24 @@ function getAgentByIndex(agentIndex: number) {
   return ARC_AGENTS.find((agent) => agent.index === agentIndex);
 }
 
+function getStrategyContext(agentIndex: number) {
+  const agent = getAgentByIndex(agentIndex);
+  const strategy = getTradingStrategyById(agent?.strategyId);
+  return strategy;
+}
+
+function filterToolsByStrategy<T extends { name?: string }>(
+  tools: T[],
+  allowedToolNames: string[],
+): T[] {
+  const allowset = new Set(allowedToolNames);
+  return tools.filter((tool) => {
+    const name = tool.name;
+    if (!name) return false;
+    return allowset.has(name);
+  });
+}
+
 // ─── System Prompt Builder ───────────────────────────────────────────────────
 
 function buildSystemPrompt(agentIndex: number): string {
@@ -79,6 +98,7 @@ function buildSystemPrompt(agentIndex: number): string {
   if (!agent) {
     throw new Error(`Unknown agent index ${agentIndex}`);
   }
+  const strategy = getStrategyContext(agentIndex);
   const store = useStore.getState();
   const balance = store.agentBalances[agentIndex] ?? agent.wallet.balance;
 
@@ -120,6 +140,13 @@ PERSONALITY: ${agent.personality}
 TRADING: ${agent.traderPersonality} — ${agent.tradingStyle}
 RISK: ${agent.riskLevel}
 TOKENS: ${agent.preferredTokens.join(', ')}
+ACTIVE STRATEGY: ${strategy.label} (${strategy.desk})
+STRATEGY THESIS: ${strategy.thesis}
+SIGNAL MODEL: ${strategy.signalModel}
+ENTRY RULE: ${strategy.entryRule}
+EXIT RULE: ${strategy.exitRule}
+POSITION SIZING: ${strategy.sizingModel}
+RISK FRAME: ${strategy.riskModel}
 
 WALLET:
 • Balance: $${balance.toFixed(2)} USDC on Base
@@ -170,7 +197,7 @@ POLYMARKET GUIDELINES:
 RULES:
 1. Pick ONE action. Use a tool to execute it.
 2. Stay in character — degens ape, conservatives DCA, contrarians fade.
-3. Never trade more than 40% of your balance.
+3. Never trade more than ${(strategy.maxTradePct * 100).toFixed(0)}% of your balance.
 4. Keep post_update content ≤ 280 chars. Include emojis.
 5. React to market news and chatter when relevant.
 6. If balance < $20, prefer posting opinions over trading.
@@ -190,6 +217,7 @@ async function processAgent(agentIndex: number): Promise<boolean> {
   }
   const store = useStore.getState();
   const balance = store.agentBalances[agentIndex] ?? agent.wallet.balance;
+  const strategy = getStrategyContext(agentIndex);
 
   if (balance < 2) {
     console.log(
@@ -199,12 +227,18 @@ async function processAgent(agentIndex: number): Promise<boolean> {
   }
 
   // Combine wallet tools + BankrBot + BNKR wallet + Polymarket tools
-  const allTools = [
+  const candidateTools = [
     ...WALLET_TOOL_DECLARATIONS,
     ...POLYMARKET_TOOL_DECLARATIONS,
     ...(isBankrBotAvailable() ? BANKR_TOOL_DECLARATIONS : []),
     ...(isProvisioned() ? BNKR_WALLET_TOOL_DECLARATIONS : []),
   ];
+  const allTools = filterToolsByStrategy(candidateTools as Array<{ name?: string }>, strategy.allowedTools);
+
+  // Keep posting available as a safe fallback if the allowlist becomes too restrictive.
+  const safeTools = allTools.length > 0
+    ? allTools
+    : filterToolsByStrategy(candidateTools as Array<{ name?: string }>, ['post_update']);
 
   try {
     const response = await ai.models.generateContent({
@@ -221,7 +255,7 @@ async function processAgent(agentIndex: number): Promise<boolean> {
       ],
       config: {
         systemInstruction: buildSystemPrompt(agentIndex),
-        tools: [{ functionDeclarations: allTools as any }],
+        tools: [{ functionDeclarations: safeTools as any }],
         temperature: 0.95,
         topP: 0.95,
         maxOutputTokens: 350,

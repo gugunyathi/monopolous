@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { ArcExecution } from '../models/ArcExecution.js';
 import { ArcPolicy } from '../models/ArcPolicy.js';
+import { DEFAULT_STRATEGY_ID, isStrategyId } from '../constants/strategyCatalog.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -44,6 +45,8 @@ export interface ArcTransferResult {
 
 export interface ArcPolicyPatchInput {
   enabled?: boolean;
+  selectedStrategyId?: string;
+  strategyOverrides?: Record<string, unknown>;
   allowlistedToAddresses?: string[];
   allowlistedTokenAddresses?: string[];
   maxUsdcPerTx?: number;
@@ -118,6 +121,8 @@ async function getOrCreatePolicy(agentIndex: number) {
     {
       $setOnInsert: {
         enabled: true,
+        selectedStrategyId: DEFAULT_STRATEGY_ID,
+        strategyOverrides: {},
         allowlistedToAddresses: [],
         allowlistedTokenAddresses: [],
         maxUsdcPerTx: MAX_USDC_PER_TX,
@@ -305,6 +310,18 @@ export async function updateArcPolicy(agentIndex: number, patch: ArcPolicyPatchI
   if (typeof patch.enabled === 'boolean') {
     updates.enabled = patch.enabled;
   }
+  if (typeof patch.selectedStrategyId === 'string') {
+    if (!isStrategyId(patch.selectedStrategyId)) {
+      throw new Error(`Unknown strategy id: ${patch.selectedStrategyId}`);
+    }
+    updates.selectedStrategyId = patch.selectedStrategyId;
+  }
+  if (patch.strategyOverrides !== undefined) {
+    if (!patch.strategyOverrides || typeof patch.strategyOverrides !== 'object' || Array.isArray(patch.strategyOverrides)) {
+      throw new Error('strategyOverrides must be an object');
+    }
+    updates.strategyOverrides = patch.strategyOverrides;
+  }
   if (patch.allowlistedToAddresses) {
     updates.allowlistedToAddresses = patch.allowlistedToAddresses.map((x) => validateAddress(x, 'allowlisted destination'));
   }
@@ -336,6 +353,8 @@ export async function updateArcPolicy(agentIndex: number, patch: ArcPolicyPatchI
       $set: updates,
       $setOnInsert: {
         enabled: true,
+        selectedStrategyId: DEFAULT_STRATEGY_ID,
+        strategyOverrides: {},
         allowlistedToAddresses: [],
         allowlistedTokenAddresses: [],
         maxUsdcPerTx: MAX_USDC_PER_TX,

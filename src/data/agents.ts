@@ -55,6 +55,17 @@ export interface AgentData {
   tradingStyle: string;
   riskLevel: 'Low' | 'Medium' | 'High' | 'Degen';
   preferredTokens: string[];
+  strategyId:
+    | 'gs_quant_arch'
+    | 'rentech_backtest'
+    | 'two_sigma_risk'
+    | 'citadel_alpha'
+    | 'jane_street_mm'
+    | 'aqr_factor'
+    | 'de_shaw_stat_arb'
+    | 'bridgewater_macro'
+    | 'bloomberg_data'
+    | 'virtu_execution';
   outfit: string;
 }
 
@@ -254,30 +265,34 @@ const PERSONALITIES: string[] = [
 const TRADER_PROFILES = [
   {
     personality: 'Hyper-aggressive degen',
-    style: 'High-leverage scalping',
+    style: 'High-leverage momentum',
     risk: 'Degen',
     tokens: ['PEPE', 'WIF', 'BONK', 'DOGE'],
+    strategyId: 'citadel_alpha',
     outfits: ['Neon Hoodie', 'Cyberpunk Visor', 'Streetwear']
   },
   {
     personality: 'Conservative institutional',
-    style: 'Long-term value investing',
+    style: 'Factor-balanced portfolio construction',
     risk: 'Low',
     tokens: ['BTC', 'ETH', 'SOL'],
+    strategyId: 'aqr_factor',
     outfits: ['Tailored Suit', 'Luxury Watch', 'Minimalist']
   },
   {
     personality: 'Technical chart wizard',
-    style: 'Swing trading based on RSI/MACD',
+    style: 'Signal-weighted quantitative trend model',
     risk: 'Medium',
     tokens: ['SOL', 'JUP', 'PYTH', 'LINK'],
+    strategyId: 'gs_quant_arch',
     outfits: ['Tech Vest', 'Smart Glasses', 'Cargo Pants']
   },
   {
     personality: 'Chaos-driven contrarian',
-    style: 'Shorting the tops, buying the blood',
+    style: 'Pairs mean reversion and dispersion',
     risk: 'High',
     tokens: ['ETH', 'LDO', 'PENDLE'],
+    strategyId: 'de_shaw_stat_arb',
     outfits: ['Vintage Leather Jacket', 'Combat Boots', 'Distressed Denim']
   },
   {
@@ -285,7 +300,48 @@ const TRADER_PROFILES = [
     style: 'Social sentiment momentum',
     risk: 'High',
     tokens: ['DOGE', 'SHIB', 'FLOKI'],
+    strategyId: 'bridgewater_macro',
     outfits: ['Bright Tracksuit', 'Gold Chains', 'Designer Sneakers']
+  },
+  {
+    personality: 'Data integrity purist',
+    style: 'Trade only on validated feeds',
+    risk: 'Low',
+    tokens: ['USDC', 'ETH', 'LINK'],
+    strategyId: 'bloomberg_data',
+    outfits: ['Clean White Shirt', 'Dark Denim', 'Analyst Backpack']
+  },
+  {
+    personality: 'Inventory neutral market maker',
+    style: 'Spread capture with inventory control',
+    risk: 'Medium',
+    tokens: ['ETH', 'WETH', 'USDC'],
+    strategyId: 'jane_street_mm',
+    outfits: ['Navy Bomber', 'Minimal Sneakers', 'Slim Watch']
+  },
+  {
+    personality: 'Execution specialist',
+    style: 'Adaptive TWAP/VWAP slicing',
+    risk: 'Medium',
+    tokens: ['BTC', 'ETH', 'SOL'],
+    strategyId: 'virtu_execution',
+    outfits: ['Performance Jacket', 'Running Shoes', 'Headset']
+  },
+  {
+    personality: 'Backtest skeptic',
+    style: 'Walk-forward validated alpha only',
+    risk: 'Low',
+    tokens: ['BTC', 'ETH', 'USDC'],
+    strategyId: 'rentech_backtest',
+    outfits: ['Monochrome Hoodie', 'Classic Cap', 'Research Notebook']
+  },
+  {
+    personality: 'Capital preservation expert',
+    style: 'VaR-constrained tactical allocation',
+    risk: 'Low',
+    tokens: ['USDC', 'ETH', 'BTC'],
+    strategyId: 'two_sigma_risk',
+    outfits: ['Gray Blazer', 'Leather Loafers', 'Risk Tablet']
   }
 ];
 
@@ -390,6 +446,7 @@ _agents.push({
   tradingStyle: ceoProfile.style,
   riskLevel: ceoProfile.risk as any,
   preferredTokens: ceoProfile.tokens,
+  strategyId: ceoProfile.strategyId,
   outfit: pick(ceoProfile.outfits, 0)
 });
 
@@ -436,6 +493,7 @@ for (let i = 1; i < TOTAL_COUNT; i++) {
     tradingStyle: profile.style,
     riskLevel: riskLevel,
     preferredTokens: profile.tokens,
+    strategyId: profile.strategyId,
     outfit: pick(profile.outfits, i)
   });
 }
@@ -461,6 +519,7 @@ const ARC_ROLES: Array<{
   tradingStyle: string;
   riskLevel: 'Low' | 'Medium' | 'High' | 'Degen';
   preferredTokens: string[];
+  strategyId: AgentData['strategyId'];
   outfit: string;
   color: string;
 }> = [
@@ -473,6 +532,7 @@ const ARC_ROLES: Array<{
     tradingStyle: 'Macro Trend Following',
     riskLevel: 'Low',
     preferredTokens: ['USDC', 'ETH'],
+    strategyId: 'bridgewater_macro',
     outfit: 'Sharp navy suit with silver circuit-board cufflinks',
     color: '#6366f1',
   },
@@ -485,6 +545,7 @@ const ARC_ROLES: Array<{
     tradingStyle: 'Mean Reversion',
     riskLevel: 'Low',
     preferredTokens: ['USDC'],
+    strategyId: 'de_shaw_stat_arb',
     outfit: 'Black turtleneck and noise-cancelling headphones',
     color: '#22d3ee',
   },
@@ -497,6 +558,7 @@ const ARC_ROLES: Array<{
     tradingStyle: 'Momentum',
     riskLevel: 'High',
     preferredTokens: ['USDC', 'ETH', 'WETH'],
+    strategyId: 'citadel_alpha',
     outfit: 'Hoodie with "Gas is Free If You Use USDC" print',
     color: '#f59e0b',
   },
@@ -509,6 +571,7 @@ const ARC_ROLES: Array<{
     tradingStyle: 'Statistical Arbitrage',
     riskLevel: 'Medium',
     preferredTokens: ['USDC', 'ETH'],
+    strategyId: 'de_shaw_stat_arb',
     outfit: 'Hard hat and tool belt with USB drives instead of tools',
     color: '#10b981',
   },
@@ -521,6 +584,7 @@ const ARC_ROLES: Array<{
     tradingStyle: 'Value Investing',
     riskLevel: 'Low',
     preferredTokens: ['USDC'],
+    strategyId: 'two_sigma_risk',
     outfit: 'White lab coat, red pens everywhere',
     color: '#ef4444',
   },
@@ -533,6 +597,7 @@ const ARC_ROLES: Array<{
     tradingStyle: 'Factor Investing',
     riskLevel: 'Medium',
     preferredTokens: ['USDC', 'ETH'],
+    strategyId: 'aqr_factor',
     outfit: 'Blazer over a spreadsheet-patterned shirt',
     color: '#a855f7',
   },
@@ -545,6 +610,7 @@ const ARC_ROLES: Array<{
     tradingStyle: 'Breakout Trading',
     riskLevel: 'Medium',
     preferredTokens: ['USDC', 'ETH'],
+    strategyId: 'gs_quant_arch',
     outfit: 'Branded Arc hoodie and always-on laptop stickers',
     color: '#f97316',
   },
@@ -557,6 +623,7 @@ const ARC_ROLES: Array<{
     tradingStyle: 'High-Frequency',
     riskLevel: 'Degen',
     preferredTokens: ['USDC'],
+    strategyId: 'jane_street_mm',
     outfit: 'Dark glasses and server-rack tie',
     color: '#84cc16',
   },
@@ -569,6 +636,7 @@ const ARC_ROLES: Array<{
     tradingStyle: 'Micro-Cap',
     riskLevel: 'Degen',
     preferredTokens: ['USDC'],
+    strategyId: 'virtu_execution',
     outfit: 'Minimalist grey t-shirt — wastes nothing, even fabric',
     color: '#64748b',
   },
@@ -581,6 +649,7 @@ const ARC_ROLES: Array<{
     tradingStyle: 'Long-Term Hold',
     riskLevel: 'Low',
     preferredTokens: ['USDC', 'ETH'],
+    strategyId: 'rentech_backtest',
     outfit: 'Aerospace-style flight jacket with Arc mission patch',
     color: '#0ea5e9',
   },
@@ -616,6 +685,7 @@ const _arcAgents: AgentData[] = ARC_ROLES.slice(0, ARC_WALLET_OVERRIDES.length).
   tradingStyle: r.tradingStyle,
   riskLevel: r.riskLevel,
   preferredTokens: r.preferredTokens,
+  strategyId: r.strategyId,
   outfit: r.outfit,
 }));
 

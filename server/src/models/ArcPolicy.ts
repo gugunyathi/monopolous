@@ -3,6 +3,8 @@ import { Document, Schema, model } from 'mongoose';
 export interface IArcPolicy extends Document {
   agentIndex: number;
   enabled: boolean;
+  selectedStrategyId: string;
+  strategyOverrides: Record<string, unknown>;
   allowlistedToAddresses: string[];
   allowlistedTokenAddresses: string[];
   maxUsdcPerTx: number;
@@ -17,6 +19,8 @@ const ArcPolicySchema = new Schema<IArcPolicy>(
   {
     agentIndex: { type: Number, required: true, unique: true, index: true },
     enabled: { type: Boolean, default: true },
+    selectedStrategyId: { type: String, default: 'two_sigma_risk' },
+    strategyOverrides: { type: Schema.Types.Mixed, default: {} },
     allowlistedToAddresses: {
       type: [String],
       default: [],

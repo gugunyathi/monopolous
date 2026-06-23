@@ -397,10 +397,11 @@ export function ArcAgentsPanel() {
             return (
               <div 
                 key={policy._id}
-                className="grid grid-cols-[1.2fr_0.9fr_1fr_0.85fr_0.5fr] items-center border-b border-white/5 px-2 py-1.5 text-[10px] hover:bg-white/5 group cursor-pointer"
+                className="grid grid-cols-[1.2fr_0.78fr_0.9fr_1fr_0.85fr_0.5fr] items-center border-b border-white/5 px-2 py-1.5 text-[10px] hover:bg-white/5 group cursor-pointer"
                 onClick={() => setEditingPolicy(policy)}
               >
                 <span className="truncate text-zinc-300">{arcAgent?.role ?? `Agent ${policy.agentIndex}`}</span>
+                <span className="truncate text-[9px] text-fuchsia-300 font-mono">{policy.selectedStrategyId ?? 'two_sigma_risk'}</span>
                 <span className="text-cyan-300 font-mono">${policy.maxUsdcPerTx}</span>
                 <span className="text-emerald-300 font-mono">${policy.maxUsdcPerDay}</span>
                 <span className="text-zinc-400 font-mono">{policy.cooldownSeconds}s</span>

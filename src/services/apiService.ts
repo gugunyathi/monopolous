@@ -221,6 +221,8 @@ export interface ArcPolicyRecord {
   _id: string;
   agentIndex: number;
   enabled: boolean;
+  selectedStrategyId?: string;
+  strategyOverrides?: Record<string, unknown>;
   allowlistedToAddresses: string[];
   allowlistedTokenAddresses: string[];
   maxUsdcPerTx: number;
@@ -578,6 +580,8 @@ export async function getArcPolicies(): Promise<ArcPolicyRecord[]> {
 
 export async function updateArcPolicy(agentIndex: number, updates: {
   enabled?: boolean;
+  selectedStrategyId?: string;
+  strategyOverrides?: Record<string, unknown>;
   allowlistedToAddresses?: string[];
   allowlistedTokenAddresses?: string[];
   maxUsdcPerTx?: number;

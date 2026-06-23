@@ -7,6 +7,7 @@ import {
   type ArcPolicyPatchInput,
 } from './arcExecutor.js';
 import { ArcExecution } from '../models/ArcExecution.js';
+import { getExecutionMultiplier } from '../constants/strategyCatalog.js';
 
 const ARC_AUTONOMY_ENABLED = (process.env.ARC_AUTONOMY_ENABLED ?? 'false').toLowerCase() === 'true';
 const ARC_AUTONOMY_INTERVAL_MS = Number(process.env.ARC_AUTONOMY_INTERVAL_MS ?? '60000');
@@ -45,6 +46,7 @@ export interface ArcAutonomyTickRecord {
 interface ArcPolicyLike {
   agentIndex: number;
   enabled: boolean;
+  selectedStrategyId?: string;
   allowlistedToAddresses?: string[];
   maxUsdcPerTx: number;
   maxUsdcPerDay: number;
@@ -122,10 +124,12 @@ function buildRecipientPool(
   return candidates.filter((addr) => allowset.has(addr));
 }
 
-function calculateAmount(maxUsdcPerTx: number): string {
+function calculateAmount(maxUsdcPerTx: number, strategyId?: string, capUtilization = 0): string {
   const base = clampPositive(ARC_AUTONOMY_TRANSFER_AMOUNT, 1);
   const ceiling = clampPositive(maxUsdcPerTx, 1);
-  const amount = Math.min(base, ceiling);
+  const strategyMultiplier = getExecutionMultiplier(strategyId);
+  const utilizationPenalty = capUtilization >= 0.8 ? 0.75 : 1;
+  const amount = Math.min(base * strategyMultiplier * utilizationPenalty, ceiling);
   return amount.toFixed(2);
 }
 
@@ -206,7 +210,8 @@ export async function runArcAutonomyTick(): Promise<ArcAutonomyTickSummary> {
       }
 
       const toAddress = pickRandom(recipients);
-      const amount = calculateAmount(policy.maxUsdcPerTx);
+      const capUtilization = globalCapLimit > 0 ? globalUsed / globalCapLimit : 0;
+      const amount = calculateAmount(policy.maxUsdcPerTx, policy.selectedStrategyId, capUtilization);
       const amountValue = Number(amount);
 
       if (globalUsed + amountValue > globalCapLimit) {

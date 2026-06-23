@@ -8,11 +8,14 @@
 import { useState } from 'react';
 import { ARC_AGENTS } from '../data/agents';
 import { type ArcPolicyRecord } from '../services/apiService';
+import { DEFAULT_STRATEGY_ID, getStrategyOptions, getTradingStrategyById } from '../constants/tradingStrategies';
 
 interface PolicyEditorProps {
   policy: ArcPolicyRecord;
   onSave: (updates: {
     enabled?: boolean;
+    selectedStrategyId?: string;
+    strategyOverrides?: Record<string, unknown>;
     maxUsdcPerTx?: number;
     maxUsdcPerDay?: number;
     cooldownSeconds?: number;
@@ -28,6 +31,10 @@ export function PolicyEditor({ policy, onSave, onCancel, isSaving }: PolicyEdito
 
   // Local state for editing
   const [enabled, setEnabled] = useState(policy.enabled);
+  const [selectedStrategyId, setSelectedStrategyId] = useState(policy.selectedStrategyId ?? DEFAULT_STRATEGY_ID);
+  const [strategyOverridesText, setStrategyOverridesText] = useState(
+    JSON.stringify(policy.strategyOverrides ?? {}, null, 2)
+  );
   const [maxUsdcPerTx, setMaxUsdcPerTx] = useState(String(policy.maxUsdcPerTx));
   const [maxUsdcPerDay, setMaxUsdcPerDay] = useState(String(policy.maxUsdcPerDay));
   const [cooldownSeconds, setCooldownSeconds] = useState(String(policy.cooldownSeconds));
@@ -68,8 +75,21 @@ export function PolicyEditor({ policy, onSave, onCancel, isSaving }: PolicyEdito
         .map((x) => x.trim())
         .filter((x) => x.length > 0);
 
+      let strategyOverrides: Record<string, unknown> | undefined;
+      const overridesRaw = strategyOverridesText.trim();
+      if (overridesRaw.length > 0) {
+        const parsed = JSON.parse(overridesRaw) as unknown;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          strategyOverrides = parsed as Record<string, unknown>;
+        } else {
+          throw new Error('Strategy overrides must be a JSON object');
+        }
+      }
+
       await onSave({
         enabled,
+        selectedStrategyId,
+        strategyOverrides,
         maxUsdcPerTx: txVal,
         maxUsdcPerDay: dayVal,
         cooldownSeconds: coolVal,
@@ -160,6 +180,40 @@ export function PolicyEditor({ policy, onSave, onCancel, isSaving }: PolicyEdito
               onChange={(e) => setCooldownSeconds(e.target.value)}
               disabled={isSaving || !enabled}
               className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs text-white placeholder-zinc-600 focus:border-cyan-500 focus:outline-none disabled:opacity-50"
+            />
+          </div>
+
+          {/* Strategy */}
+          <div>
+            <label className="block text-xs font-bold text-zinc-400 mb-1">Active Strategy</label>
+            <select
+              value={selectedStrategyId}
+              onChange={(e) => setSelectedStrategyId(e.target.value)}
+              disabled={isSaving || !enabled}
+              className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs text-white placeholder-zinc-600 focus:border-cyan-500 focus:outline-none disabled:opacity-50"
+            >
+              {getStrategyOptions().map((option) => (
+                <option key={option.id} value={option.id} className="bg-zinc-900 text-white">
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[9px] text-zinc-500">
+              {getTradingStrategyById(selectedStrategyId).thesis}
+            </p>
+          </div>
+
+          {/* Strategy Overrides */}
+          <div>
+            <label className="block text-xs font-bold text-zinc-400 mb-1">
+              Strategy Overrides (JSON object)
+            </label>
+            <textarea
+              value={strategyOverridesText}
+              onChange={(e) => setStrategyOverridesText(e.target.value)}
+              disabled={isSaving || !enabled}
+              placeholder={`{\n  "urgency": 0.65,\n  "regimeConfidence": 0.7\n}`}
+              className="w-full h-24 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-[10px] font-mono text-white placeholder-zinc-600 focus:border-cyan-500 focus:outline-none disabled:opacity-50 resize-none"
             />
           </div>
 
