@@ -1,37 +1,72 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI ?? '';
-let connectionPromise: Promise<void> | null = null;
+mongoose.set('bufferCommands', false);
+
+const RAW_MONGODB_URI = process.env.MONGODB_URI?.trim() ?? '';
+
+function isValidMongoUri(uri: string): boolean {
+  if (!uri) return false;
+  if (!uri.startsWith('mongodb://') && !uri.startsWith('mongodb+srv://')) return false;
+  if (uri.includes('<password>') || uri.includes('<username>') || uri.includes('YOUR_')) return false;
+  return true;
+}
+
+const MONGODB_URI = isValidMongoUri(RAW_MONGODB_URI) ? RAW_MONGODB_URI : '';
+let isOfflineMode = !MONGODB_URI;
 let listenersAttached = false;
+let isConnecting = false;
+
+export function isDBConnected(): boolean {
+  return !isOfflineMode && mongoose.connection.readyState === 1;
+}
+
+export function isDBOffline(): boolean {
+  return isOfflineMode || mongoose.connection.readyState !== 1;
+}
 
 export async function connectDB(): Promise<void> {
   if (!MONGODB_URI) {
-    throw new Error('[DB] MONGODB_URI environment variable is not set');
+    isOfflineMode = true;
+    return;
   }
 
-  if (mongoose.connection.readyState === 1) {
+  if (isOfflineMode || isConnecting || mongoose.connection.readyState === 1) {
     return;
   }
 
   if (!listenersAttached) {
-    mongoose.connection.on('connected', () => console.log('[DB] MongoDB connected'));
-    mongoose.connection.on('disconnected', () => console.log('[DB] MongoDB disconnected'));
-    mongoose.connection.on('error', (err) => console.error('[DB] MongoDB error:', err));
+    mongoose.connection.on('connected', () => {
+      isOfflineMode = false;
+      console.log('[DB] MongoDB connected successfully');
+    });
+    mongoose.connection.on('disconnected', () => {
+      // Offline fallback
+    });
+    mongoose.connection.on('error', () => {
+      isOfflineMode = true;
+    });
     listenersAttached = true;
   }
 
-  if (!connectionPromise) {
-    connectionPromise = mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 10_000,
-      socketTimeoutMS: 45_000,
-    }).then(() => undefined)
-      .catch((error) => {
-        connectionPromise = null;
-        throw error;
-      });
+  isConnecting = true;
+  try {
+    await mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 2_000,
+      socketTimeoutMS: 4_000,
+      connectTimeoutMS: 2_000,
+      autoIndex: false,
+    });
+    isOfflineMode = false;
+  } catch {
+    isOfflineMode = true;
+    try {
+      await mongoose.disconnect();
+    } catch {
+      // Clean up
+    }
+  } finally {
+    isConnecting = false;
   }
-
-  await connectionPromise;
 }
 
 export { mongoose };

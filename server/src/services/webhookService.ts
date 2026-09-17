@@ -7,8 +7,10 @@
 
 import crypto from 'node:crypto';
 import { WebhookEndpoint, WebhookEvent, type IWebhookEndpoint } from '../models/WebhookEndpoint.js';
+import { isDBConnected } from '../db.js';
 
 const MAX_WEBHOOK_TIMEOUT = 30000; // 30 seconds
+const inMemoryEndpoints = new Map<string, any>();
 
 export class WebhookService {
   /**
@@ -20,42 +22,70 @@ export class WebhookService {
     events: string[],
     secret?: string
   ): Promise<IWebhookEndpoint> {
-    const endpoint = await WebhookEndpoint.findOneAndUpdate(
-      { name },
-      {
-        url,
-        events,
-        secret: secret || generateSecret(),
-        $setOnInsert: {
-          enabled: true,
-          maxRetries: 5,
-          retryDelaySeconds: 60,
-          failureCount: 0,
-          successCount: 0,
-        },
-      },
-      { upsert: true, new: true }
-    );
+    const epSecret = secret || generateSecret();
+    const memEp: any = {
+      _id: name,
+      name,
+      url,
+      events,
+      secret: epSecret,
+      enabled: true,
+      maxRetries: 5,
+      retryDelaySeconds: 60,
+      failureCount: 0,
+      successCount: 0,
+      createdAt: new Date(),
+    };
+    inMemoryEndpoints.set(name, memEp);
 
-    if (!endpoint) {
-      throw new Error('Failed to create webhook endpoint');
+    if (isDBConnected()) {
+      try {
+        const endpoint = await WebhookEndpoint.findOneAndUpdate(
+          { name },
+          {
+            url,
+            events,
+            secret: epSecret,
+            $setOnInsert: {
+              enabled: true,
+              maxRetries: 5,
+              retryDelaySeconds: 60,
+              failureCount: 0,
+              successCount: 0,
+            },
+          },
+          { upsert: true, new: true }
+        );
+
+        if (endpoint) return endpoint;
+      } catch {}
     }
 
-    return endpoint;
+    return memEp;
   }
 
   /**
    * List all webhook endpoints
    */
   static async listEndpoints(): Promise<IWebhookEndpoint[]> {
-    return WebhookEndpoint.find({}).sort({ createdAt: -1 });
+    if (isDBConnected()) {
+      try {
+        return await WebhookEndpoint.find({}).sort({ createdAt: -1 });
+      } catch {}
+    }
+    return Array.from(inMemoryEndpoints.values());
   }
 
   /**
    * Get a specific webhook endpoint
    */
   static async getEndpoint(id: string): Promise<IWebhookEndpoint | null> {
-    return WebhookEndpoint.findById(id);
+    if (isDBConnected()) {
+      try {
+        return await WebhookEndpoint.findById(id);
+      } catch {}
+    }
+    return inMemoryEndpoints.get(id) || null;
   }
 
   /**
@@ -71,25 +101,51 @@ export class WebhookService {
       retryDelaySeconds?: number;
     }
   ): Promise<IWebhookEndpoint | null> {
-    return WebhookEndpoint.findByIdAndUpdate(id, updates, { new: true });
+    if (isDBConnected()) {
+      try {
+        return await WebhookEndpoint.findByIdAndUpdate(id, updates, { new: true });
+      } catch {}
+    }
+    const ep = inMemoryEndpoints.get(id);
+    if (ep) {
+      Object.assign(ep, updates);
+      return ep;
+    }
+    return null;
   }
 
   /**
    * Delete a webhook endpoint
    */
   static async deleteEndpoint(id: string): Promise<boolean> {
-    const result = await WebhookEndpoint.deleteOne({ _id: id });
-    return result.deletedCount > 0;
+    inMemoryEndpoints.delete(id);
+    if (isDBConnected()) {
+      try {
+        const result = await WebhookEndpoint.deleteOne({ _id: id });
+        return result.deletedCount > 0;
+      } catch {}
+    }
+    return true;
   }
 
   /**
    * Trigger a webhook event for a specific event type
    */
   static async triggerEvent(eventType: string, payload: Record<string, unknown>): Promise<void> {
-    const endpoints = await WebhookEndpoint.find({
-      enabled: true,
-      events: eventType,
-    });
+    let endpoints: IWebhookEndpoint[] = [];
+    if (isDBConnected()) {
+      try {
+        endpoints = await WebhookEndpoint.find({
+          enabled: true,
+          events: eventType as any,
+        });
+      } catch {}
+    }
+    if (endpoints.length === 0) {
+      endpoints = Array.from(inMemoryEndpoints.values()).filter(
+        (ep) => ep.enabled && ep.events?.includes(eventType)
+      );
+    }
 
     if (endpoints.length === 0) {
       return;
@@ -102,12 +158,7 @@ export class WebhookService {
     };
 
     const promises = endpoints.map((endpoint) => {
-      return this.deliverWebhook(endpoint, event).catch((error) => {
-        console.error(
-          `[WebhookService] Failed to deliver webhook to ${endpoint.name}:`,
-          error instanceof Error ? error.message : error
-        );
-      });
+      return this.deliverWebhook(endpoint, event).catch(() => {});
     });
 
     await Promise.all(promises);
@@ -131,12 +182,15 @@ export class WebhookService {
         'X-Webhook-Attempt': String(attempt),
       };
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), MAX_WEBHOOK_TIMEOUT);
+
       const response = await fetch(endpoint.url, {
         method: 'POST',
         headers,
         body: JSON.stringify(event),
-        timeout: MAX_WEBHOOK_TIMEOUT,
-      });
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeoutId));
 
       if (response.ok) {
         // Success

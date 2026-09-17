@@ -1,4 +1,6 @@
 
+import { VehicleToken } from './data/vehicles';
+
 export interface PolymarketMarket {
   id:            string;
   slug:          string;
@@ -162,6 +164,10 @@ export interface BoardTile {
   category?: string;
   // For prediction tiles — which topic market to surface
   polymarketTopic?: string;
+  volume24h?: string;
+  volatility?: 'High' | 'Medium' | 'Extreme' | 'Low';
+  volumeScore?: number; // 0 to 100
+  floors?: number; // Skyscraper floors built on this board tile
 }
 
 export interface CharacterState {
@@ -169,6 +175,10 @@ export interface CharacterState {
   isThinking: boolean;
   aiResponse: string;
   isDebugOpen: boolean;
+  isHeatmapMode: boolean;
+  toggleHeatmapMode: () => void;
+  mobileOptimizationMode: boolean;
+  toggleMobileOptimization: () => void;
   instanceCount: number;
   worldSize: number;
   boidsParams: BoidsParams;
@@ -236,8 +246,16 @@ export interface CharacterState {
   boardTiles: BoardTile[];
   agentBalances: Record<number, number>;
   leaderboard: { agentIndex: number; netWorth: number }[];
+  agentVehicles: VehicleToken[];
+  isPhysicalCharactersModalOpen: boolean;
+  togglePhysicalCharactersModal: () => void;
+  buyVehicle: (vehicleId: string, agentIndex: number) => void;
+  buyTileFloor: (tileIndex: number, agentIndex: number) => void;
   
   performance: PerformanceStats;
+
+  weather: 'sun' | 'rain' | 'snow' | 'none';
+  setWeather: (weather: 'sun' | 'rain' | 'snow' | 'none') => void;
 
   setAnimation: (name: string) => void;
   setThinking: (isThinking: boolean) => void;

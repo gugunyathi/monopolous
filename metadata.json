@@ -1,5 +1,6 @@
 {
-  "name": "Autonomous Agents Lab",
-  "description": "A high-performance 3D corporate simulation featuring autonomous agents powered by Gemini AI and WebGPU compute shaders.",
-  "requestFramePermissions": []
+  "name": "Monopolous Autonomous Agents Lab",
+  "description": "A 3D corporate simulation featuring autonomous agents powered by Gemini AI and WebGPU/WebGL compute shaders.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -6,8 +6,13 @@ export class Engine {
   public timer: THREE.Timer;
 
   constructor(container: HTMLElement) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderer.setPixelRatio(window.devicePixelRatio);
+    // Option E: Adaptive Mobile DPR & Quality Scaler (clamp pixelRatio to max 1.75 to prevent GPU thermal throttling on mobile)
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+    const maxDPR = isMobile ? 1.5 : 2.0;
+    const adaptivePixelRatio = Math.min(window.devicePixelRatio, maxDPR);
+
+    this.renderer = new THREE.WebGLRenderer({ antialias: !isMobile, powerPreference: 'high-performance' });
+    this.renderer.setPixelRatio(adaptivePixelRatio);
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     
     this.renderer.shadowMap.enabled = true;

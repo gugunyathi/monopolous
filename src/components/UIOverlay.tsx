@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
-import DebugPanel from './DebugPanel';
 import HelpModal from './HelpModal';
 import ChatPanel from './ChatPanel';
 import SignInButton from './SignInButton';
@@ -18,6 +17,12 @@ import TokenLaunchesPanel from './TokenLaunchesPanel';
 import { BnkrWalletPanel } from './BnkrWalletPanel';
 import { ArcAgentsPanel } from './ArcAgentsPanel';
 import NotificationDeepLinkCard from './NotificationDeepLinkCard';
+import { HeatmapLegend } from './HeatmapLegend';
+import { PhysicalCharactersModal } from './PhysicalCharactersModal';
+import { SkyscraperModal } from './SkyscraperModal';
+import { WeatherWidget } from './WeatherWidget';
+import { TopAgentsLeaderboard } from './TopAgentsLeaderboard';
+import { AudioVoiceHUD } from './AudioVoiceHUD';
 
 function getAgentByIndex(agentIndex: number) {
   if (agentIndex >= 0 && agentIndex < AGENTS.length) return AGENTS[agentIndex];
@@ -27,8 +32,6 @@ function getAgentByIndex(agentIndex: number) {
 const UIOverlay: React.FC = () => {
   const { 
     isThinking, 
-    isDebugOpen, 
-    toggleDebug, 
     selectedNpcIndex,
     selectedPosition,
     hoveredNpcIndex,
@@ -78,6 +81,12 @@ const UIOverlay: React.FC = () => {
       <PostsFeed />
       <Leaderboard />
       <CameraControls />
+      <HeatmapLegend />
+      <PhysicalCharactersModal />
+      <SkyscraperModal />
+      <WeatherWidget />
+      <TopAgentsLeaderboard />
+      <AudioVoiceHUD />
 
       {/* Token Launches Panel — shows in social/posts mode */}
       {(viewMode === 'social' || viewMode === 'posts') && (
@@ -230,25 +239,6 @@ const UIOverlay: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Debug Button — top center, DEV only */}
-      {import.meta.env.DEV && (
-        <div className="fixed top-4 md:top-6 left-1/2 -translate-x-1/2 z-[130] pointer-events-auto">
-          <button
-            onClick={toggleDebug}
-            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 border ${
-              isDebugOpen
-              ? 'bg-zinc-900 text-white border-zinc-900 shadow-lg'
-              : 'bg-white/80 text-zinc-500 border-black/5 hover:bg-white hover:text-zinc-900'
-            }`}
-          >
-            {isDebugOpen ? 'Close Debug' : 'Debug'}
-          </button>
-        </div>
-      )}
-
-      {/* Debug Panel Mount — DEV only */}
-      {import.meta.env.DEV && <DebugPanel />}
 
       {/* Help Modal */}
       <HelpModal isOpen={isHelpOpen} onClose={() => setHelpOpen(false)} />

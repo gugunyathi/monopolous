@@ -425,32 +425,80 @@ function pick<T>(arr: T[], seed: number): T {
 
 const _agents: AgentData[] = [];
 
-// Index 0: CEO (Player)
+// Index 0: CEO (Player) - Arthur Sterling (The Supreme Executive & Racecar Driver)
 const ceoProfile = pick(TRADER_PROFILES, 1); // Institutional
 _agents.push({
   index: 0,
   department: 'Executive',
-  role: 'CEO',
-  expertise: ['Strategy', 'Leadership', 'Vision'],
-  mission: 'Lead FakeClaw Inc. to market dominance',
-  personality: 'Decisive and inspiring leader',
+  role: 'CEO & Founder (Racecar Driver)',
+  expertise: ['Strategy', 'Leadership', 'Speed Execution'],
+  mission: 'Drive FakeClaw Inc. to the absolute apex of global liquidity',
+  personality: 'Decisive, high-velocity leader who pilots the Classic Racecar token',
   isPlayer: true,
-  color: '#7EACEA', // Light Blue
+  color: '#eab308', // Gold / Amber
   wallet: {
     address: generateWalletAddress(0), // replaced at runtime after auth
     skills: assignWalletSkills('Executive', 'Low', true),
-    balance: 10_000,
+    balance: 15_000,
     chain: 'base',
   },
   traderPersonality: ceoProfile.personality,
   tradingStyle: ceoProfile.style,
   riskLevel: ceoProfile.risk as any,
   preferredTokens: ceoProfile.tokens,
-  strategyId: ceoProfile.strategyId,
-  outfit: pick(ceoProfile.outfits, 0)
+  strategyId: ceoProfile.strategyId as AgentData['strategyId'],
+  outfit: 'Carbon-fiber racing jacket & gold executive timepiece'
 });
 
-// Indices 1-99: Employees
+// Indices 1-5: Distinct Individual Top Agents (Battleship, Top Hat, Scottish Terrier, Thimble, Steam Iron)
+const TOP_INDIVIDUAL_AGENTS = [
+  {
+    role: 'Chief Strategy Officer (Battleship Captain)',
+    department: 'Executive',
+    name: 'Victoria Vance',
+    color: '#3b82f6',
+    token: 'Iron Dreadnought Battleship',
+    mission: 'Command maritime capital flows and defend treasury against macroeconomic shocks',
+    personality: 'Steely, battle-tested strategist who commands the Dreadnought'
+  },
+  {
+    role: 'Head of Quantitative Alpha (Top Hat Aristocrat)',
+    department: 'Finance',
+    name: 'Lord Reginald Sterling',
+    color: '#a855f7',
+    token: 'Gentleman Top Hat',
+    mission: 'Extract maximum rental yield from prime DeFi protocol land holdings',
+    personality: 'Sophisticated aristocrat with unmatched quantitative statistical models'
+  },
+  {
+    role: 'Lead Crypto Scout (Lucky Terrier)',
+    department: 'Marketing',
+    name: 'Barnaby "Hound" Smith',
+    color: '#10b981',
+    token: 'Lucky Scottish Terrier',
+    mission: 'Sniff out early-stage token airdrops and viral memecoin momentum',
+    personality: 'Energetic, loyal scout who never misses a liquidity signal'
+  },
+  {
+    role: 'Artisan Smart Contract Lead (Golden Thimble)',
+    department: 'Production',
+    name: 'Madame Colette Weaver',
+    color: '#ff007a',
+    token: 'Golden Sewing Thimble',
+    mission: 'Weave bulletproof, gas-optimized EVM bytecode architectures',
+    personality: 'Precise artisan who stitches together complex cross-chain contracts'
+  },
+  {
+    role: 'Director of Infrastructure (Steam Locomotive)',
+    department: 'Production',
+    name: 'Viktor "Railroad" Kozlov',
+    color: '#f97316',
+    token: 'Vintage Steam Iron',
+    mission: 'Keep pipeline freight moving at high steam pressure without downtime',
+    personality: 'Relentless steam engineer who flattens out every regulatory roadblock'
+  }
+];
+
 const otherDepts = DEPARTMENTS.filter(d => d.name !== 'People');
 const peopleDept = DEPARTMENTS.find(d => d.name === 'People')!;
 
@@ -458,15 +506,28 @@ for (let i = 1; i < TOTAL_COUNT; i++) {
   let dept: DepartmentConfig;
   let n: number;
   let roleIdx: number;
+  let customRole: string | undefined;
+  let customMission: string | undefined;
+  let customPersonality: string | undefined;
+  let customColor: string | undefined;
 
-  if (i === 1) {
+  if (i >= 1 && i <= 5) {
+    const spec = TOP_INDIVIDUAL_AGENTS[i - 1];
+    dept = DEPARTMENTS.find(d => d.name === spec.department) || DEPARTMENTS[0];
+    n = i;
+    roleIdx = i;
+    customRole = spec.role;
+    customMission = spec.mission;
+    customPersonality = spec.personality;
+    customColor = spec.color;
+  } else if (i === 6) {
     // Special case: Only one NPC for People department
     dept = peopleDept;
     n = 0;
     roleIdx = 0;
   } else {
     // Distribute the rest among other departments
-    n = i - 2;
+    n = i - 7;
     dept = otherDepts[n % otherDepts.length];
     roleIdx = Math.floor(n / otherDepts.length) % dept.roles.length;
   }
@@ -477,12 +538,12 @@ for (let i = 1; i < TOTAL_COUNT; i++) {
   _agents.push({
     index: i,
     department: dept.name,
-    role: dept.roles[roleIdx],
+    role: customRole || dept.roles[roleIdx],
     expertise: dept.expertise[roleIdx],
-    mission: pick(dept.missions, n),
-    personality: pick(PERSONALITIES, n),
+    mission: customMission || pick(dept.missions, n),
+    personality: customPersonality || pick(PERSONALITIES, n),
     isPlayer: false,
-    color: dept.color,
+    color: customColor || dept.color,
     wallet: {
       address: generateWalletAddress(i),
       skills: assignWalletSkills(dept.name, riskLevel, false),
@@ -493,7 +554,7 @@ for (let i = 1; i < TOTAL_COUNT; i++) {
     tradingStyle: profile.style,
     riskLevel: riskLevel,
     preferredTokens: profile.tokens,
-    strategyId: profile.strategyId,
+    strategyId: profile.strategyId as AgentData['strategyId'],
     outfit: pick(profile.outfits, i)
   });
 }

@@ -4,15 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build",
+    "dev": "tsx server.ts",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit",
-    "server": "tsx watch server/src/index.ts",
-    "server:prod": "node -r tsconfig-paths/register -e \"require('./server/dist/index.js')\"",
-    "dev:full": "concurrently \"npm run dev\" \"npm run server\"",
-    "build:server": "tsc -p server/tsconfig.json"
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@base-org/account": "^2.5.6",
@@ -26,7 +23,6 @@
     "@types/cors": "^2.8.19",
     "@types/jsonwebtoken": "^9.0.10",
     "@vitejs/plugin-react": "^5.0.4",
-    "better-sqlite3": "^12.4.1",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "ethers": "^6.16.0",
@@ -51,11 +47,12 @@
     "@types/node": "^22.14.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.183.0",
     "autoprefixer": "^10.4.21",
-    "concurrently": "^9.2.1",
+    "esbuild": "^0.25.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.3",
+    "typescript": "^5.8.2",
     "vite": "^6.2.0"
   }
 }

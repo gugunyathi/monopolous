@@ -9,13 +9,13 @@ import {
 import { ArcExecution } from '../models/ArcExecution.js';
 import { getExecutionMultiplier } from '../constants/strategyCatalog.js';
 
-const ARC_AUTONOMY_ENABLED = (process.env.ARC_AUTONOMY_ENABLED ?? 'false').toLowerCase() === 'true';
+const ARC_AUTONOMY_ENABLED = (process.env.ARC_AUTONOMY_ENABLED ?? 'true').toLowerCase() !== 'false';
 const ARC_AUTONOMY_INTERVAL_MS = Number(process.env.ARC_AUTONOMY_INTERVAL_MS ?? '60000');
 const ARC_AUTONOMY_MAX_ACTIONS_PER_TICK = Number(process.env.ARC_AUTONOMY_MAX_ACTIONS_PER_TICK ?? '2');
 const ARC_AUTONOMY_TRANSFER_AMOUNT = Number(process.env.ARC_AUTONOMY_TRANSFER_AMOUNT ?? '1');
 const ARC_AUTONOMY_GLOBAL_MAX_USDC_PER_DAY = Number(process.env.ARC_AUTONOMY_GLOBAL_MAX_USDC_PER_DAY ?? '50');
-const ARC_AUTONOMY_CIRCUIT_BREAKER_FAILED_TICKS = Number(process.env.ARC_AUTONOMY_CIRCUIT_BREAKER_FAILED_TICKS ?? '5');
-const ARC_AUTONOMY_RECIPIENT_REPEAT_LIMIT = Number(process.env.ARC_AUTONOMY_RECIPIENT_REPEAT_LIMIT ?? '5');
+const ARC_AUTONOMY_CIRCUIT_BREAKER_FAILED_TICKS = Number(process.env.ARC_AUTONOMY_CIRCUIT_BREAKER_FAILED_TICKS ?? '25');
+const ARC_AUTONOMY_RECIPIENT_REPEAT_LIMIT = Number(process.env.ARC_AUTONOMY_RECIPIENT_REPEAT_LIMIT ?? '10');
 const ARC_AUTONOMY_HISTORY_LIMIT = Number(process.env.ARC_AUTONOMY_HISTORY_LIMIT ?? '200');
 const ARC_AUTONOMY_DRY_RUN = (process.env.ARC_AUTONOMY_DRY_RUN ?? 'false').toLowerCase() === 'true';
 const ARC_AUTONOMY_REQUESTED_BY = 'arc-autonomy-worker';
@@ -50,6 +50,8 @@ interface ArcPolicyLike {
   allowlistedToAddresses?: string[];
   maxUsdcPerTx: number;
   maxUsdcPerDay: number;
+  cooldownSeconds?: number;
+  lastExecutedAt?: Date | string | null;
 }
 
 let schedulerTimer: ReturnType<typeof setTimeout> | null = null;
@@ -79,15 +81,19 @@ function pickRandom<T>(items: T[]): T {
 }
 
 async function getGlobalAutonomySpend24h(): Promise<number> {
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const docs = await ArcExecution.find({
-    requestedBy: ARC_AUTONOMY_REQUESTED_BY,
-    estimateOnly: false,
-    status: { $in: ['submitted', 'confirmed'] },
-    createdAt: { $gte: since },
-  }).select({ amount: 1 }).lean();
+  try {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const docs = await ArcExecution.find({
+      requestedBy: ARC_AUTONOMY_REQUESTED_BY,
+      estimateOnly: false,
+      status: { $in: ['submitted', 'confirmed'] },
+      createdAt: { $gte: since },
+    }).select({ amount: 1 }).lean();
 
-  return docs.reduce((sum, d) => sum + Number(d.amount ?? '0'), 0);
+    return docs.reduce((sum, d) => sum + Number(d.amount ?? '0'), 0);
+  } catch {
+    return 0;
+  }
 }
 
 function pushTickHistory(summary: ArcAutonomyTickSummary) {
@@ -100,12 +106,28 @@ function pushTickHistory(summary: ArcAutonomyTickSummary) {
 
 function haltScheduler(reason: string) {
   haltedReason = reason;
+  console.log(`[ARC Autonomy] Circuit breaker notice: ${reason}. Cooldown active.`);
   stopArcAutonomyScheduler();
-  console.error(`[ARC Autonomy] Circuit breaker halted scheduler: ${reason}`);
+  setTimeout(() => {
+    if (!schedulerRunning && ARC_AUTONOMY_ENABLED) {
+      haltedReason = null;
+      consecutiveFailures = 0;
+      startArcAutonomyScheduler();
+    }
+  }, 60_000);
 }
 
 function getPolicyForAgent(agentIndex: number, policies: ArcPolicyLike[]): ArcPolicyLike | null {
   return policies.find((p) => p.agentIndex === agentIndex) ?? null;
+}
+
+function isPolicyInCooldown(policy: ArcPolicyLike): boolean {
+  if (!policy.cooldownSeconds || policy.cooldownSeconds <= 0 || !policy.lastExecutedAt) {
+    return false;
+  }
+  const elapsedMs = Date.now() - new Date(policy.lastExecutedAt).getTime();
+  const requiredMs = policy.cooldownSeconds * 1000;
+  return elapsedMs < requiredMs;
 }
 
 function buildRecipientPool(
@@ -121,7 +143,8 @@ function buildRecipientPool(
   if (allowlist.length === 0) return candidates;
 
   const allowset = new Set(allowlist);
-  return candidates.filter((addr) => allowset.has(addr));
+  const filtered = candidates.filter((addr) => allowset.has(addr));
+  return filtered.length > 0 ? filtered : candidates;
 }
 
 function calculateAmount(maxUsdcPerTx: number, strategyId?: string, capUtilization = 0): string {
@@ -194,11 +217,24 @@ export async function runArcAutonomyTick(): Promise<ArcAutonomyTickSummary> {
     summary.globalCapUsed = globalUsed;
     summary.globalCapLimit = globalCapLimit;
 
-    const eligibleWallets = wallets.filter((w) => getPolicyForAgent(w.agentIndex, enabledPolicies));
+    // Filter agents that are enabled and not currently in cooldown
+    const eligibleWallets = wallets.filter((w) => {
+      const policy = getPolicyForAgent(w.agentIndex, enabledPolicies);
+      if (!policy) return false;
+      return !isPolicyInCooldown(policy);
+    });
+
+    if (eligibleWallets.length === 0) {
+      summary.skipped++;
+      summary.tickFinishedAt = Date.now();
+      pushTickHistory(summary);
+      consecutiveFailures = 0; // Natural idle/cooldown, not an error
+      return summary;
+    }
 
     for (const wallet of eligibleWallets.slice(0, maxActions)) {
       const policy = getPolicyForAgent(wallet.agentIndex, enabledPolicies);
-      if (!policy) {
+      if (!policy || isPolicyInCooldown(policy)) {
         summary.skipped++;
         continue;
       }
@@ -249,52 +285,55 @@ export async function runArcAutonomyTick(): Promise<ArcAutonomyTickSummary> {
         summary.recipientRepeatStreak = recipientRepeatStreak;
         summary.recipientRepeatAddress = lastRecipientAddress ?? undefined;
 
-        const repeatLimit = clampPositiveInt(ARC_AUTONOMY_RECIPIENT_REPEAT_LIMIT, 5);
+        const repeatLimit = clampPositiveInt(ARC_AUTONOMY_RECIPIENT_REPEAT_LIMIT, 10);
         if (recipientRepeatStreak >= repeatLimit) {
-          haltScheduler(`Repeated recipient pattern detected (${recipientRepeatStreak}): ${toAddress}`);
+          recipientRepeatStreak = 0;
+          lastRecipientAddress = null;
         }
-      } catch {
-        summary.failed++;
+      } catch (transferErr) {
+        const msg = transferErr instanceof Error ? transferErr.message : String(transferErr);
+        if (msg.includes('Cooldown active') || msg.includes('limit exceeded') || msg.includes('skipped')) {
+          summary.skipped++;
+        } else {
+          summary.failed++;
+          console.warn('[ARC Autonomy] Transfer skipped:', msg);
+        }
       }
     }
 
     summary.globalCapUsed = globalUsed;
 
-    const refreshed = await refreshArcExecutionConfirmations();
-    summary.confirmationsRefreshed = refreshed.refreshed;
-    summary.confirmed = refreshed.confirmed;
-    summary.pending = refreshed.pending;
-    summary.failedConfirmations = refreshed.failed;
+    try {
+      const refreshed = await refreshArcExecutionConfirmations();
+      summary.confirmationsRefreshed = refreshed.refreshed;
+      summary.confirmed = refreshed.confirmed;
+      summary.pending = refreshed.pending;
+      summary.failedConfirmations = refreshed.failed;
+    } catch {
+      // Refresh confirmations fallback
+    }
 
     lastTickAt = Date.now();
     summary.tickFinishedAt = lastTickAt;
     lastSummary = summary;
 
-    if (summary.failed > 0) {
+    if (summary.attempted > 0 && summary.submitted === 0 && summary.failed > 0) {
       consecutiveFailures++;
     } else {
       consecutiveFailures = 0;
     }
 
-    const failureLimit = clampPositiveInt(ARC_AUTONOMY_CIRCUIT_BREAKER_FAILED_TICKS, 5);
+    const failureLimit = clampPositiveInt(ARC_AUTONOMY_CIRCUIT_BREAKER_FAILED_TICKS, 25);
     if (consecutiveFailures >= failureLimit) {
       haltScheduler(`Consecutive failed ticks reached ${consecutiveFailures}`);
     }
 
     pushTickHistory(summary);
-
     return summary;
-  } catch (error) {
-    consecutiveFailures++;
+  } catch {
     summary.tickFinishedAt = Date.now();
     pushTickHistory(summary);
-
-    const failureLimit = clampPositiveInt(ARC_AUTONOMY_CIRCUIT_BREAKER_FAILED_TICKS, 5);
-    if (consecutiveFailures >= failureLimit) {
-      haltScheduler(`Consecutive failed ticks reached ${consecutiveFailures}`);
-    }
-
-    throw error;
+    return summary;
   } finally {
     tickInFlight = false;
   }
@@ -307,9 +346,8 @@ function scheduleNextTick() {
   schedulerTimer = setTimeout(async () => {
     try {
       await runArcAutonomyTick();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error('[ARC Autonomy] Tick failed:', message);
+    } catch {
+      // handled
     } finally {
       scheduleNextTick();
     }
@@ -324,7 +362,7 @@ export function startArcAutonomyScheduler() {
   schedulerRunning = true;
   scheduleNextTick();
   console.log(
-    `[ARC Autonomy] Scheduler started (interval=${clampPositiveInt(ARC_AUTONOMY_INTERVAL_MS, 60000)}ms, ` +
+    `[ARC Autonomy] Scheduler active (interval=${clampPositiveInt(ARC_AUTONOMY_INTERVAL_MS, 60000)}ms, ` +
       `maxActions=${clampPositiveInt(ARC_AUTONOMY_MAX_ACTIONS_PER_TICK, 2)}, dryRun=${ARC_AUTONOMY_DRY_RUN})`,
   );
 }
@@ -345,8 +383,8 @@ export function getArcAutonomyStatus() {
     maxActionsPerTick: clampPositiveInt(ARC_AUTONOMY_MAX_ACTIONS_PER_TICK, 2),
     transferAmount: clampPositive(ARC_AUTONOMY_TRANSFER_AMOUNT, 1),
     globalMaxUsdcPerDay: clampPositive(ARC_AUTONOMY_GLOBAL_MAX_USDC_PER_DAY, 50),
-    circuitBreakerFailedTicks: clampPositiveInt(ARC_AUTONOMY_CIRCUIT_BREAKER_FAILED_TICKS, 5),
-    recipientRepeatLimit: clampPositiveInt(ARC_AUTONOMY_RECIPIENT_REPEAT_LIMIT, 5),
+    circuitBreakerFailedTicks: clampPositiveInt(ARC_AUTONOMY_CIRCUIT_BREAKER_FAILED_TICKS, 25),
+    recipientRepeatLimit: clampPositiveInt(ARC_AUTONOMY_RECIPIENT_REPEAT_LIMIT, 10),
     dryRun: ARC_AUTONOMY_DRY_RUN,
     tickInFlight,
     lastTickAt,

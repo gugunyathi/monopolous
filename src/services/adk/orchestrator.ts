@@ -31,7 +31,7 @@ import {
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
-const MODEL = 'gemini-2.0-flash';
+const MODEL = 'gemini-3.7-flash';
 const AGENTS_PER_CYCLE = 5;
 const ARC_AGENTS_PER_CYCLE = 1;
 const CYCLE_MIN_MS = 45_000;

@@ -34,7 +34,7 @@ export class BehaviorManager {
   ) {
     const { worldSize } = useStore.getState();
     this.worldSize = worldSize;
-    this.tileSize = (worldSize * 2) / 9;
+    this.tileSize = (worldSize * 2) / 8;
 
     stateBuffer.setState(PLAYER_INDEX, AgentBehavior.FROZEN);
 
@@ -300,11 +300,11 @@ export class BehaviorManager {
     const halfWorld = this.worldSize;
     const ts = this.tileSize;
     let x = 0, z = 0;
-    if (t < 9) {
+    if (t < 8) {
       x = halfWorld - (t * ts); z = halfWorld;
-    } else if (t < 17) {
+    } else if (t < 16) {
       x = -halfWorld; z = halfWorld - ((t - 8) * ts);
-    } else if (t < 25) {
+    } else if (t < 24) {
       x = -halfWorld + ((t - 16) * ts); z = -halfWorld;
     } else {
       x = halfWorld; z = -halfWorld + ((t - 24) * ts);

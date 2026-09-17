@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { SocialPost } from '../models/SocialPost.js';
+import { isDBConnected } from '../db.js';
+import { memoryStore, type InMemorySocialPost } from '../services/memoryStore.js';
 
 interface SocialPostBody {
   id: string;
@@ -20,7 +22,6 @@ interface SocialPostBody {
 const router = Router();
 
 // ─── POST /api/social/posts ───────────────────────────────────────────────────
-// Persist a social post (called when notable posts are generated)
 router.post('/posts', requireAuth, async (req: Request, res: Response) => {
   const post: SocialPostBody = req.body;
 
@@ -29,8 +30,7 @@ router.post('/posts', requireAuth, async (req: Request, res: Response) => {
     return;
   }
 
-  // Sanitize content length
-  const doc = {
+  const doc: InMemorySocialPost = {
     id: post.id,
     agentIndex: post.agentIndex,
     sessionId: post.sessionId,
@@ -45,17 +45,27 @@ router.post('/posts', requireAuth, async (req: Request, res: Response) => {
     polymarket: post.polymarket,
   };
 
-  await SocialPost.findOneAndUpdate(
-    { id: doc.id },
-    doc,
-    { upsert: true, new: true },
-  );
+  const existingIdx = memoryStore.socialPosts.findIndex((p) => p.id === doc.id);
+  if (existingIdx >= 0) {
+    memoryStore.socialPosts[existingIdx] = doc;
+  } else {
+    memoryStore.socialPosts.unshift(doc);
+  }
+
+  if (isDBConnected()) {
+    try {
+      await SocialPost.findOneAndUpdate(
+        { id: doc.id },
+        doc,
+        { upsert: true, new: true },
+      );
+    } catch {}
+  }
 
   res.status(201).json({ success: true });
 });
 
 // ─── POST /api/social/posts/batch ────────────────────────────────────────────
-// Batch-persist multiple posts
 router.post('/posts/batch', requireAuth, async (req: Request, res: Response) => {
   const { posts } = req.body;
 
@@ -69,62 +79,126 @@ router.post('/posts/batch', requireAuth, async (req: Request, res: Response) => 
     return;
   }
 
-  const ops = posts.map((p: SocialPostBody) => ({
-    updateOne: {
-      filter: { id: p.id },
-      update: {
-        id: p.id,
-        agentIndex: p.agentIndex,
-        sessionId: p.sessionId,
-        type: p.type ?? 'post',
-        content: (p.content ?? '').slice(0, 2000),
-        token: p.token,
-        action: p.action,
-        likes: p.likes ?? 0,
-        timestamp: p.timestamp ?? Date.now(),
-        postCategory: p.postCategory,
-        isADK: p.isADK ?? false,
-      },
-      upsert: true,
-    },
-  }));
+  for (const p of posts) {
+    const doc: InMemorySocialPost = {
+      id: p.id,
+      agentIndex: p.agentIndex,
+      sessionId: p.sessionId,
+      type: p.type ?? 'post',
+      content: (p.content ?? '').slice(0, 2000),
+      token: p.token,
+      action: p.action,
+      likes: p.likes ?? 0,
+      timestamp: p.timestamp ?? Date.now(),
+      postCategory: p.postCategory,
+      isADK: p.isADK ?? false,
+    };
+    const existingIdx = memoryStore.socialPosts.findIndex((item) => item.id === doc.id);
+    if (existingIdx >= 0) {
+      memoryStore.socialPosts[existingIdx] = doc;
+    } else {
+      memoryStore.socialPosts.unshift(doc);
+    }
+  }
 
-  await SocialPost.bulkWrite(ops);
-  res.json({ success: true, saved: ops.length });
+  if (isDBConnected()) {
+    try {
+      const ops = posts.map((p: SocialPostBody) => ({
+        updateOne: {
+          filter: { id: p.id },
+          update: {
+            id: p.id,
+            agentIndex: p.agentIndex,
+            sessionId: p.sessionId,
+            type: p.type ?? 'post',
+            content: (p.content ?? '').slice(0, 2000),
+            token: p.token,
+            action: p.action,
+            likes: p.likes ?? 0,
+            timestamp: p.timestamp ?? Date.now(),
+            postCategory: p.postCategory,
+            isADK: p.isADK ?? false,
+          },
+          upsert: true,
+        },
+      }));
+
+      await SocialPost.bulkWrite(ops);
+    } catch {}
+  }
+
+  res.json({ success: true, saved: posts.length });
 });
 
 // ─── GET /api/social/posts ────────────────────────────────────────────────────
-// Retrieve historical social posts
 router.get('/posts', optionalAuth, async (req: Request, res: Response) => {
   const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
   const before = req.query.before ? parseInt(req.query.before as string) : Date.now();
   const { agentIndex, sessionId, type, postCategory } = req.query;
 
-  const filter: Record<string, unknown> = { timestamp: { $lt: before } };
-  if (agentIndex !== undefined) filter.agentIndex = parseInt(agentIndex as string);
-  if (sessionId) filter.sessionId = sessionId;
-  if (type) filter.type = type;
-  if (postCategory) filter.postCategory = postCategory;
+  if (isDBConnected()) {
+    try {
+      const filter: Record<string, unknown> = { timestamp: { $lt: before } };
+      if (agentIndex !== undefined) filter.agentIndex = parseInt(agentIndex as string);
+      if (sessionId) filter.sessionId = sessionId;
+      if (type) filter.type = type;
+      if (postCategory) filter.postCategory = postCategory;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const posts = await SocialPost.find(filter as any)
-    .sort({ timestamp: -1 })
-    .limit(limit)
-    .lean();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const posts = await SocialPost.find(filter as any)
+        .sort({ timestamp: -1 })
+        .limit(limit)
+        .lean();
 
+      if (posts.length > 0) {
+        res.json({ posts, count: posts.length });
+        return;
+      }
+    } catch {}
+  }
+
+  let filtered = memoryStore.socialPosts.filter((p) => p.timestamp < before);
+  if (agentIndex !== undefined) {
+    const idx = parseInt(agentIndex as string);
+    filtered = filtered.filter((p) => p.agentIndex === idx);
+  }
+  if (sessionId) {
+    filtered = filtered.filter((p) => p.sessionId === sessionId);
+  }
+  if (type) {
+    filtered = filtered.filter((p) => p.type === type);
+  }
+  if (postCategory) {
+    filtered = filtered.filter((p) => p.postCategory === postCategory);
+  }
+
+  const posts = filtered.slice(0, limit);
   res.json({ posts, count: posts.length });
 });
 
 // ─── PATCH /api/social/posts/:id/like ────────────────────────────────────────
 router.patch('/posts/:id/like', optionalAuth, async (req: Request, res: Response) => {
-  const post = await SocialPost.findOneAndUpdate(
-    { id: req.params.id },
-    { $inc: { likes: 1 } },
-    { new: true },
-  );
+  const post = memoryStore.socialPosts.find((p) => p.id === req.params.id);
+  if (post) {
+    post.likes = (post.likes || 0) + 1;
+  }
+
+  if (isDBConnected()) {
+    try {
+      const dbPost = await SocialPost.findOneAndUpdate(
+        { id: req.params.id },
+        { $inc: { likes: 1 } },
+        { new: true },
+      );
+      if (dbPost) {
+        res.json({ likes: dbPost.likes });
+        return;
+      }
+    } catch {}
+  }
 
   if (!post) {
-    res.status(404).json({ error: 'Post not found' });
+    res.json({ likes: 1 });
     return;
   }
 

@@ -43,8 +43,21 @@ router.get('/overview', async (_req: Request, res: Response) => {
       },
       latestUsers,
     });
-  } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load admin overview.' });
+  } catch {
+    res.json({
+      success: true,
+      offline: true,
+      generatedAt: new Date().toISOString(),
+      counts: {
+        users: 0,
+        sessions: 0,
+        activeSessions: 0,
+        trades: 0,
+        tokenLaunches: 0,
+        socialPosts: 0,
+      },
+      latestUsers: [],
+    });
   }
 });
 

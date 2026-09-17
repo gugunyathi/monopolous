@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { CharacterState, AnimationName, PerformanceStats, BoidsParams, ActiveEncounter, Broadcast, SocialPost, PolymarketMarket, PolymarketActiveBet } from '../types';
 import { AGENTS, ARC_AGENTS, CORE_AGENT_COUNT } from '../data/agents';
+import { MONOPOLY_VEHICLES } from '../data/vehicles';
 import {
   recordTrade,
   recordTokenLaunch,
@@ -29,6 +30,10 @@ export const useStore = create<CharacterState>()(
     isThinking: false,
     aiResponse: "Hello! I'm your AI character. Type something to talk to me.",
     isDebugOpen: false,
+    isHeatmapMode: false,
+    toggleHeatmapMode: () => set((state) => ({ isHeatmapMode: !state.isHeatmapMode })),
+    mobileOptimizationMode: typeof window !== 'undefined' ? window.innerWidth < 768 : false,
+    toggleMobileOptimization: () => set((state) => ({ mobileOptimizationMode: !state.mobileOptimizationMode })),
     instanceCount: CORE_AGENT_COUNT + ARC_AGENTS.length,
     worldSize: 25,      // radius of Kaldera
 
@@ -147,44 +152,81 @@ export const useStore = create<CharacterState>()(
       } as SocialPost, ...state.socialFeed].slice(0, 50),
     })),
 
-    // Monopoly Game State
+    // Monopoly Game State - Strategic Crypto Exchanges, DEXs & Prediction Markets (32 tiles)
     boardTiles: [
-      { id: '0', name: 'GENESIS', type: 'start' },
-      { id: '1', name: 'Uniswap', type: 'property', price: 60, color: '#ff007a', category: 'DEX' },
-      { id: '2', name: 'AIRDROP', type: 'event' },
-      { id: '3', name: 'Sushiswap', type: 'property', price: 60, color: '#ff007a', category: 'DEX' },
-      { id: '4', name: 'GAS TAX', type: 'tax', price: 200 },
-      { id: '5', name: 'Curve', type: 'property', price: 200, color: '#00d1ff', category: 'Stable' },
-      { id: '6', name: 'Aave', type: 'property', price: 100, color: '#b6509e', category: 'Lending' },
-      { id: '7', name: 'POLY: YES?', type: 'prediction', color: '#9333ea', polymarketTopic: 'crypto' },
-      { id: '8', name: 'Compound', type: 'property', price: 100, color: '#b6509e', category: 'Lending' },
-      { id: '9', name: 'MakerDAO', type: 'property', price: 120, color: '#b6509e', category: 'Lending' },
-      { id: '10', name: 'REKT', type: 'jail' },
-      { id: '11', name: 'Lido', type: 'property', price: 140, color: '#ff8c00', category: 'LSD' },
-      { id: '12', name: 'RocketPool', type: 'property', price: 140, color: '#ff8c00', category: 'LSD' },
-      { id: '13', name: 'Frax', type: 'property', price: 160, color: '#ff8c00', category: 'LSD' },
-      { id: '14', name: 'MEV BOT', type: 'property', price: 200, color: '#00d1ff', category: 'Infra' },
-      { id: '15', name: 'Chainlink', type: 'property', price: 180, color: '#2a5ada', category: 'Oracle' },
-      { id: '16', name: 'Pyth', type: 'property', price: 180, color: '#2a5ada', category: 'Oracle' },
-      { id: '17', name: 'POLY: BET?', type: 'prediction', color: '#9333ea', polymarketTopic: 'bitcoin' },
-      { id: '18', name: 'The Graph', type: 'property', price: 200, color: '#2a5ada', category: 'Oracle' },
-      { id: '19', name: 'POLY: ODDS?', type: 'prediction', color: '#9333ea', polymarketTopic: 'ethereum' },
-      { id: '20', name: 'GMX', type: 'property', price: 220, color: '#ef4444', category: 'Perps' },
-      { id: '21', name: 'dYdX', type: 'property', price: 220, color: '#ef4444', category: 'Perps' },
-      { id: '22', name: 'Jupiter', type: 'property', price: 240, color: '#ef4444', category: 'Perps' },
-      { id: '23', name: 'Solana', type: 'property', price: 260, color: '#00ffa3', category: 'L1' },
-      { id: '24', name: 'Ethereum', type: 'property', price: 260, color: '#00ffa3', category: 'L1' },
-      { id: '25', name: 'Bitcoin', type: 'property', price: 280, color: '#00ffa3', category: 'L1' },
-      { id: '26', name: 'SEC FINE', type: 'tax', price: 150 },
-      { id: '27', name: 'OpenSea', type: 'property', price: 300, color: '#2081e2', category: 'NFT' },
-      { id: '28', name: 'Blur', type: 'property', price: 300, color: '#2081e2', category: 'NFT' },
-      { id: '29', name: 'MagicEden', type: 'property', price: 320, color: '#2081e2', category: 'NFT' },
-      { id: '30', name: 'POLY: CALL?', type: 'prediction', color: '#9333ea', polymarketTopic: 'defi' },
-      { id: '31', name: 'Coinbase', type: 'property', price: 350, color: '#0052ff', category: 'CEX' },
-      { id: '32', name: 'Binance', type: 'property', price: 400, color: '#0052ff', category: 'CEX' },
+      { id: '0', name: 'GENESIS', type: 'start', volume24h: '$0', volatility: 'Low', volumeScore: 10 },
+      { id: '1', name: 'Uniswap', type: 'property', price: 60, color: '#ff007a', category: 'DEX', volume24h: '$1.8B', volatility: 'High', volumeScore: 85 },
+      { id: '2', name: 'Aerodrome', type: 'property', price: 80, color: '#0052ff', category: 'DEX', volume24h: '$420M', volatility: 'Medium', volumeScore: 65 },
+      { id: '3', name: 'AIRDROP', type: 'event', volume24h: '$50M', volatility: 'Extreme', volumeScore: 90 },
+      { id: '4', name: 'Hyperliquid', type: 'property', price: 100, color: '#10b981', category: 'DEX', volume24h: '$3.4B', volatility: 'Extreme', volumeScore: 95 },
+      { id: '5', name: 'GAS SPIKE', type: 'tax', price: 100, volume24h: '$12M', volatility: 'High', volumeScore: 70 },
+      { id: '6', name: 'Aave', type: 'property', price: 120, color: '#b6509e', category: 'Lending', volume24h: '$890M', volatility: 'Medium', volumeScore: 60 },
+      { id: '7', name: 'POLY: BTC $100K?', type: 'prediction', color: '#9333ea', polymarketTopic: 'bitcoin', volume24h: '$120M', volatility: 'High', volumeScore: 88 },
+      { id: '8', name: 'REKT', type: 'jail', volume24h: '$0', volatility: 'Extreme', volumeScore: 40 },
+      { id: '9', name: 'Coinbase', type: 'property', price: 200, color: '#0052ff', category: 'CEX', volume24h: '$5.2B', volatility: 'Medium', volumeScore: 92 },
+      { id: '10', name: 'Binance', type: 'property', price: 220, color: '#f3ba2f', category: 'CEX', volume24h: '$14.6B', volatility: 'High', volumeScore: 99 },
+      { id: '11', name: 'Bybit', type: 'property', price: 220, color: '#f7931a', category: 'CEX', volume24h: '$6.8B', volatility: 'Extreme', volumeScore: 94 },
+      { id: '12', name: 'Gate.io', type: 'property', price: 240, color: '#23527c', category: 'CEX', volume24h: '$1.5B', volatility: 'Medium', volumeScore: 62 },
+      { id: '13', name: 'OKX', type: 'property', price: 240, color: '#1a1a1a', category: 'CEX', volume24h: '$4.1B', volatility: 'High', volumeScore: 82 },
+      { id: '14', name: 'Kraken', type: 'property', price: 260, color: '#5741d9', category: 'CEX', volume24h: '$2.3B', volatility: 'Low', volumeScore: 58 },
+      { id: '15', name: 'KALSHI: FED RATE?', type: 'prediction', color: '#9333ea', polymarketTopic: 'fed', volume24h: '$85M', volatility: 'Medium', volumeScore: 75 },
+      { id: '16', name: 'Curve', type: 'property', price: 180, color: '#00d1ff', category: 'Stable', volume24h: '$340M', volatility: 'Low', volumeScore: 45 },
+      { id: '17', name: 'Compound', type: 'property', price: 180, color: '#b6509e', category: 'Lending', volume24h: '$290M', volatility: 'Low', volumeScore: 42 },
+      { id: '18', name: 'Lido', type: 'property', price: 200, color: '#ff8c00', category: 'LSD', volume24h: '$750M', volatility: 'Low', volumeScore: 50 },
+      { id: '19', name: 'MakerDAO', type: 'property', price: 200, color: '#b6509e', category: 'Lending', volume24h: '$620M', volatility: 'Low', volumeScore: 48 },
+      { id: '20', name: 'GMX', type: 'property', price: 220, color: '#ef4444', category: 'Perps', volume24h: '$810M', volatility: 'Extreme', volumeScore: 86 },
+      { id: '21', name: 'dYdX', type: 'property', price: 220, color: '#6966ff', category: 'Perps', volume24h: '$1.1B', volatility: 'High', volumeScore: 78 },
+      { id: '22', name: 'Jupiter', type: 'property', price: 240, color: '#c792ea', category: 'Perps', volume24h: '$1.4B', volatility: 'Extreme', volumeScore: 89 },
+      { id: '23', name: 'PREDICTIT', type: 'prediction', color: '#9333ea', polymarketTopic: 'election', volume24h: '$45M', volatility: 'Medium', volumeScore: 68 },
+      { id: '24', name: 'Solana', type: 'property', price: 280, color: '#14f195', category: 'L1', volume24h: '$3.8B', volatility: 'Extreme', volumeScore: 91 },
+      { id: '25', name: 'Ethereum', type: 'property', price: 300, color: '#627eea', category: 'L1', volume24h: '$7.5B', volatility: 'High', volumeScore: 96 },
+      { id: '26', name: 'Bitcoin', type: 'property', price: 320, color: '#f7931a', category: 'L1', volume24h: '$18.2B', volatility: 'High', volumeScore: 100 },
+      { id: '27', name: 'SEC FINE', type: 'tax', price: 200, volume24h: '$5M', volatility: 'Extreme', volumeScore: 55 },
+      { id: '28', name: 'OpenSea', type: 'property', price: 350, color: '#2081e2', category: 'NFT', volume24h: '$110M', volatility: 'Medium', volumeScore: 52 },
+      { id: '29', name: 'Blur', type: 'property', price: 350, color: '#ff6b00', category: 'NFT', volume24h: '$95M', volatility: 'High', volumeScore: 60 },
+      { id: '30', name: 'POLY: ETH ETF?', type: 'prediction', color: '#9333ea', polymarketTopic: 'ethereum', volume24h: '$210M', volatility: 'High', volumeScore: 84 },
+      { id: '31', name: 'MagicEden', type: 'property', price: 400, color: '#e42575', category: 'NFT', volume24h: '$140M', volatility: 'Medium', volumeScore: 56 },
     ],
     agentBalances: buildInitialBalances(),
     leaderboard: [],
+    agentVehicles: MONOPOLY_VEHICLES,
+    isPhysicalCharactersModalOpen: false,
+    togglePhysicalCharactersModal: () => set((state) => ({ isPhysicalCharactersModalOpen: !state.isPhysicalCharactersModalOpen })),
+    buyVehicle: (vehicleId, agentIndex) => set((state) => {
+      const vehicle = state.agentVehicles.find(v => v.id === vehicleId);
+      if (!vehicle || vehicle.ownerIndex !== undefined) return state;
+
+      const balance = state.agentBalances[agentIndex] ?? 1500;
+      if (balance >= vehicle.price) {
+        return {
+          agentBalances: { ...state.agentBalances, [agentIndex]: balance - vehicle.price },
+          agentVehicles: state.agentVehicles.map(v => v.id === vehicleId ? { ...v, ownerIndex: agentIndex } : v),
+        };
+      }
+      return state;
+    }),
+    buyTileFloor: (tileIndex, agentIndex) => set((state) => {
+      const tile = state.boardTiles[tileIndex];
+      if (!tile || tile.type !== 'property') return state;
+
+      const currentFloors = tile.floors || 0;
+      const floorCost = 150 * (currentFloors + 1);
+      const balance = state.agentBalances[agentIndex] ?? 1500;
+
+      if (balance >= floorCost) {
+        const updatedTiles = [...state.boardTiles];
+        updatedTiles[tileIndex] = {
+          ...tile,
+          floors: currentFloors + 1,
+          ownerIndex: tile.ownerIndex ?? agentIndex,
+        };
+        return {
+          agentBalances: { ...state.agentBalances, [agentIndex]: balance - floorCost },
+          boardTiles: updatedTiles,
+        };
+      }
+      return state;
+    }),
 
     performance: {
       fps: 0,
@@ -194,6 +236,9 @@ export const useStore = create<CharacterState>()(
       textures: 0,
       entities: 0
     },
+
+    weather: 'none',
+    setWeather: (weather) => set({ weather }),
 
     setAnimation: (name: string) => set({ currentAction: name }),
     setThinking: (isThinking: boolean) => set({ isThinking }),

@@ -22,6 +22,35 @@ export function agentIndexToSceneIndex(agentIndex: number): number {
 }
 import { useStore } from '../../store/useStore';
 
+const EMOJI_CACHE: Record<string, THREE.CanvasTexture> = {};
+
+function getEmojiTexture(emoji: string): THREE.CanvasTexture {
+  if (EMOJI_CACHE[emoji]) return EMOJI_CACHE[emoji];
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.clearRect(0, 0, 128, 128);
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    ctx.beginPath();
+    ctx.arc(64, 64, 56, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.6)';
+    ctx.lineWidth = 6;
+    ctx.stroke();
+
+    ctx.font = '64px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(emoji, 64, 64);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  EMOJI_CACHE[emoji] = tex;
+  return tex;
+}
+
 export class CharacterManager {
   private instanceCount = 100;
   private colors = ['#7EACEA', '#f472b6', '#fb7185', '#4ade80', '#fbbf24'];
@@ -57,10 +86,16 @@ export class CharacterManager {
 
   constructor(private scene: THREE.Scene) {}
 
+  private createProceduralGeometry(): THREE.BufferGeometry {
+    // High quality stylized low-poly agent character geometry: rounded capsule centered at floor level
+    const geom = new THREE.CapsuleGeometry(0.22, 0.55, 6, 12);
+    geom.translate(0, 0.45, 0);
+    return geom;
+  }
+
   public async load() {
     const loader = new GLTFLoader();
     try {
-      console.log('[CharacterManager] Loading character model…');
       const gltf = await loader.loadAsync('/models/character.glb');
       const model = gltf.scene;
 
@@ -72,8 +107,8 @@ export class CharacterManager {
       });
 
       if (skinnedMesh) {
-        this.baseGeometry = skinnedMesh.geometry;
-        this.baseMaterial = skinnedMesh.material as THREE.MeshStandardMaterial;
+        this.baseGeometry = (skinnedMesh as THREE.SkinnedMesh).geometry;
+        this.baseMaterial = (skinnedMesh as THREE.SkinnedMesh).material as THREE.MeshStandardMaterial;
       } else {
         model.traverse((child) => {
           if ((child as any).isMesh && !this.baseGeometry) {
@@ -83,13 +118,17 @@ export class CharacterManager {
           }
         });
       }
-    } catch (err) {
-      console.error('[CharacterManager] Failed to load character model:', err);
+    } catch {
+      // Graceful fallback to procedural humanoid geometry
     }
 
     if (!this.baseGeometry) {
-      this.baseGeometry = new THREE.CapsuleGeometry(0.2, 0.6, 4, 8);
-      this.baseMaterial = new THREE.MeshStandardMaterial({ color: 0x4ade80 });
+      this.baseGeometry = this.createProceduralGeometry();
+      this.baseMaterial = new THREE.MeshStandardMaterial({
+        color: 0x4ade80,
+        roughness: 0.4,
+        metalness: 0.1,
+      });
     }
 
     this.initInstances();
@@ -131,6 +170,12 @@ export class CharacterManager {
     const time = this.clock.getElapsedTime();
     const halfSize = this.worldSize;
 
+    const storeWeather = useStore.getState().weather;
+    let weatherSpeedFactor = 1.0;
+    if (storeWeather === 'snow') weatherSpeedFactor = 0.6; // Crypto winter slows movement
+    else if (storeWeather === 'sun') weatherSpeedFactor = 1.3; // Bull market speeds movement up
+    const effectiveSpeed = this.speed * weatherSpeedFactor;
+
     for (let i = 0; i < this.instanceCount; i++) {
       const state = this.agentStateBuffer.getState(i);
       const px = this.posArray[i * 4 + 0];
@@ -152,8 +197,8 @@ export class CharacterManager {
         const dist = Math.sqrt(dx * dx + dz * dz);
         
         if (dist > 0.2) {
-          vx = (dx / dist) * this.speed * 4.0;
-          vz = (dz / dist) * this.speed * 4.0;
+          vx = (dx / dist) * effectiveSpeed * 4.0;
+          vz = (dz / dist) * effectiveSpeed * 4.0;
           newPx += vx;
           newPz += vz;
           isMoving = true;
@@ -190,11 +235,11 @@ export class CharacterManager {
         vz += az;
         const speed = Math.sqrt(vx * vx + vz * vz);
         if (speed > 0.001) {
-          vx = (vx / speed) * this.speed;
-          vz = (vz / speed) * this.speed;
+          vx = (vx / speed) * effectiveSpeed;
+          vz = (vz / speed) * effectiveSpeed;
         } else {
           vx = 0;
-          vz = this.speed;
+          vz = effectiveSpeed;
         }
         newPx += vx;
         newPz += vz;
@@ -227,17 +272,18 @@ export class CharacterManager {
       }
 
       if (isMoving) {
-        // Bobbing
-        this.dummy.position.y = py + Math.abs(Math.sin(localTime * 10)) * 0.1;
-        this.dummy.rotation.set(0, facingAngle, Math.sin(localTime * 5) * 0.1);
+        // Subway Surfers style running & parkour jumping sprint
+        this.dummy.position.y = py + Math.abs(Math.sin(localTime * 16)) * 0.45; // High jump leap over board tiles
+        // Forward sprint lean + banking into turns
+        this.dummy.rotation.set(0.35 + Math.sin(localTime * 16) * 0.1, facingAngle, Math.sin(localTime * 8) * 0.25);
       } else if (state === AgentBehavior.WAVE) {
-        // Waving (jumping slightly and rotating)
-        this.dummy.position.y = py + Math.abs(Math.sin(localTime * 15)) * 0.2;
-        this.dummy.rotation.set(0, facingAngle + Math.sin(localTime * 10) * 0.5, 0);
+        // Waving / celebration jump
+        this.dummy.position.y = py + Math.abs(Math.sin(localTime * 20)) * 0.6;
+        this.dummy.rotation.set(0, facingAngle + Math.sin(localTime * 12) * 0.6, 0);
       } else {
-        // Idle breathing
-        this.dummy.position.y = py + Math.sin(localTime * 2) * 0.02;
-        this.dummy.rotation.set(0, facingAngle, 0);
+        // Idle breathing stance
+        this.dummy.position.y = py + Math.sin(localTime * 2) * 0.03;
+        this.dummy.rotation.set(0.1, facingAngle, 0);
       }
 
       this.dummy.updateMatrix();
@@ -249,27 +295,11 @@ export class CharacterManager {
   }
 
   private initBadges() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.fillStyle = '#8b5cf6';
-      ctx.beginPath();
-      ctx.arc(64, 64, 60, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.font = 'bold 64px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('🧠', 64, 64);
-    }
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
+    const defaultTex = getEmojiTexture('📈');
 
     for (let i = 0; i < this.instanceCount; i++) {
       const spriteMaterial = new THREE.SpriteMaterial({
-        map: texture,
+        map: defaultTex,
         transparent: true,
         depthWrite: false,
         sizeAttenuation: true,
@@ -315,7 +345,10 @@ export class CharacterManager {
   private updateBadges() {
     if (!this.posArray || this.badgeSprites.length === 0) return;
 
-    const activeADKAgents = useStore.getState().activeADKAgents;
+    const store = useStore.getState();
+    const agentBalances = store.agentBalances;
+    const activeADKAgents = store.activeADKAgents;
+    const time = this.clock.getElapsedTime();
 
     if (this.ceoLabelSprite && this.posArray) {
       const cx = this.posArray[PLAYER_INDEX * 4 + 0];
@@ -328,13 +361,32 @@ export class CharacterManager {
       const sprite = this.badgeSprites[i];
       if (!sprite) continue;
 
-      if (activeADKAgents.has(i)) {
+      // Show floating 3D emoji indicators above active agents or key characters
+      if (activeADKAgents.has(i) || i === PLAYER_INDEX || i % 3 === 0) {
         const px = this.posArray[i * 4 + 0];
         const py = this.posArray[i * 4 + 1] || 0;
         const pz = this.posArray[i * 4 + 2];
 
-        sprite.position.set(px, py + 1.2, pz);
-        sprite.scale.set(0.6, 0.6, 1);
+        const balance = agentBalances[i] ?? 1500;
+        let emoji = '📈';
+        if (balance > 3000) emoji = '👑';
+        else if (balance > 2200) emoji = '🚀';
+        else if (balance > 1800) emoji = '💎';
+        else if (balance > 1400) emoji = '💰';
+        else if (balance > 1000) emoji = '⭐';
+        else if (balance > 700) emoji = '☕';
+        else emoji = '📉';
+
+        const currentTex = getEmojiTexture(emoji);
+        if ((sprite.material as THREE.SpriteMaterial).map !== currentTex) {
+          (sprite.material as THREE.SpriteMaterial).map = currentTex;
+          (sprite.material as THREE.SpriteMaterial).needsUpdate = true;
+        }
+
+        // Gentle floating bobbing animation
+        const bob = Math.sin(time * 3 + i * 0.7) * 0.08;
+        sprite.position.set(px, py + 1.25 + bob, pz);
+        sprite.scale.set(0.55, 0.55, 1);
       } else {
         sprite.scale.set(0, 0, 1);
       }
@@ -376,19 +428,19 @@ export class CharacterManager {
     const tempColor = new THREE.Color();
 
     const NUM_BOARD_TILES = 32;
-    const tileSize = (this.worldSize * 2) / 9;
+    const tileSize = (this.worldSize * 2) / 8;
     const halfWorld = this.worldSize;
 
     const getBoardTilePos = (tileIdx: number) => {
       const t = tileIdx % NUM_BOARD_TILES;
       let tx = 0, tz = 0;
-      if (t < 9) {
+      if (t < 8) {
         tx = halfWorld - (t * tileSize);
         tz = halfWorld;
-      } else if (t < 17) {
+      } else if (t < 16) {
         tx = -halfWorld;
         tz = halfWorld - ((t - 8) * tileSize);
-      } else if (t < 25) {
+      } else if (t < 24) {
         tx = -halfWorld + ((t - 16) * tileSize);
         tz = -halfWorld;
       } else {

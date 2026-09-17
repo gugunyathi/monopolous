@@ -40,10 +40,15 @@ router.get('/executions', requireAdmin, async (req: Request, res: Response) => {
   }
 
   const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '20'), 10), 1), 100);
-  const docs = await ArcExecution.find({})
-    .sort({ createdAt: -1 })
-    .limit(limit)
-    .lean();
+  let docs: any[] = [];
+  try {
+    docs = await ArcExecution.find({})
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+  } catch {
+    docs = [];
+  }
 
   res.json({ success: true, executions: docs, refresh: refreshSummary });
 });

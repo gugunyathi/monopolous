@@ -5,8 +5,9 @@ import { AGENTS, ARC_AGENTS } from '../data/agents';
 import { getAllArcAgentWallets, isArcConfigured, provisionArcAgents } from '../services/arcWalletService';
 import { Trophy, Wallet, ChevronUp, ChevronDown, Zap, X, Check, Copy, LogIn, TrendingUp, TrendingDown, Target, Flame, BarChart2, Package } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { BasePayButton } from '@base-org/account-ui/react';
+import PayButton from './PayButton';
 import { signInWithBase } from '../services/baseAccountService';
+import { WalletConnectModal } from './WalletConnectModal';
 
 // Deterministic stats derived from agent index + riskLevel
 function agentWinRate(index: number, risk: string): number {
@@ -77,6 +78,7 @@ const Leaderboard: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [copied, setCopied] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
+  const [walletModalOpen, setWalletModalOpen] = useState(false);
 
   React.useEffect(() => {
     if (viewMode !== 'world' || !isArcConfigured()) return;
@@ -495,12 +497,11 @@ const Leaderboard: React.FC = () => {
                   <div className="flex flex-col gap-2">
                     <p className="text-center text-[10px] text-zinc-500 mb-1">Connect your wallet to send USDC</p>
                     <button
-                      onClick={handleSignIn}
-                      disabled={signingIn}
-                      className="w-full py-3.5 rounded-2xl font-black text-sm uppercase tracking-widest text-white bg-blue-500 hover:bg-blue-400 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                      onClick={() => setWalletModalOpen(true)}
+                      className="w-full py-3.5 rounded-2xl font-black text-sm uppercase tracking-widest text-white bg-blue-500 hover:bg-blue-400 active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
                       <LogIn size={15} />
-                      {signingIn ? 'Connecting…' : 'Connect Wallet'}
+                      Connect Wallet
                     </button>
                   </div>
                 ) : (
@@ -510,16 +511,12 @@ const Leaderboard: React.FC = () => {
                       <span>From: <code className="font-mono text-zinc-400">{userAddress.slice(0, 6)}…{userAddress.slice(-4)}</code></span>
                       <span className="text-blue-400 font-black">Base Mainnet</span>
                     </div>
-                    {/* BasePayButton handles the full wallet UX: sign → broadcast → confirm */}
-                    <BasePayButton
-                      paymentOptions={{
-                        amount: amountStr,
-                        to: fundingAgent.wallet.address,
-                        testnet: false,
-                      }}
+                    {/* PayButton handles the full wallet UX: sign → broadcast → confirm */}
+                    <PayButton
+                      amount={amountStr}
+                      to={fundingAgent.wallet.address}
+                      testnet={false}
                       colorScheme="dark"
-                      size="large"
-                      variant="solid"
                       onPaymentResult={handlePaymentResult}
                     />
                     <p className="text-center text-[9px] text-zinc-600 mt-1">
@@ -532,6 +529,8 @@ const Leaderboard: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <WalletConnectModal isOpen={walletModalOpen} onClose={() => setWalletModalOpen(false)} />
     </>
   );
 };

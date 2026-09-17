@@ -3,6 +3,8 @@ import { Engine } from './core/Engine';
 import { Stage } from './core/Stage';
 import { CharacterManager } from './entities/CharacterManager';
 import { Board } from './entities/Board';
+import { WeatherSystem } from './entities/WeatherSystem';
+import { ParticleBurstManager } from './entities/ParticleBurstManager';
 import { InputManager } from './input/InputManager';
 import { BehaviorManager } from './behavior/BehaviorManager';
 import { AGENTS, ARC_AGENTS, ARC_AGENT_START, PLAYER_INDEX } from '../data/agents';
@@ -17,6 +19,8 @@ export class SceneManager {
   private stage: Stage;
   private characters: CharacterManager;
   private board: Board;
+  private weatherSystem: WeatherSystem;
+  private particleBurstManager: ParticleBurstManager;
 
   private inputManager: InputManager | null = null;
   private behaviorManager: BehaviorManager | null = null;
@@ -29,6 +33,9 @@ export class SceneManager {
   private isDisposed = false;
   private manualCamera = false;
   private manualCameraTimer = 0;
+  private lastTileIndex = -1;
+  private jumpSegmentTimer = 0;
+  private lastSelectedNpcIndex: number | null = null;
 
   // Live agent pulsing ring marker
   private liveRingOuter: THREE.Mesh | null = null;
@@ -40,6 +47,8 @@ export class SceneManager {
     this.stage = new Stage(this.engine.renderer.domElement);
     this.characters = new CharacterManager(this.stage.scene);
     this.board = new Board(this.stage.scene, useStore.getState().boardTiles, useStore.getState().worldSize);
+    this.weatherSystem = new WeatherSystem(this.stage.scene);
+    this.particleBurstManager = new ParticleBurstManager(this.stage.scene);
     this.init();
   }
 
@@ -392,7 +401,16 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
     // 3. Camera follow: NPC if one is selected, otherwise always follow the player
     const { isChatting, selectedNpcIndex, setSelectedPosition, viewMode, activeSocialAgentIndex } = useStore.getState();
     
-    let followIdx = this.selectedIndex ?? PLAYER_INDEX;
+    if (selectedNpcIndex !== this.lastSelectedNpcIndex) {
+      this.lastSelectedNpcIndex = selectedNpcIndex;
+      if (selectedNpcIndex !== null) {
+        this.selectedIndex = selectedNpcIndex;
+        this.manualCamera = false;
+        this.manualCameraTimer = 0;
+      }
+    }
+
+    let followIdx = selectedNpcIndex !== null ? selectedNpcIndex : (this.selectedIndex ?? PLAYER_INDEX);
     
     // In Live/social mode: prefer following ARC or BNKR agents with wallets
     if (viewMode === 'social') {
@@ -421,6 +439,48 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
 
     const pos = this.characters.getCPUPosition(followIdx);
     this.stage.setFollowTarget(pos);
+
+    // Smart camera controller for high-value skyscrapers (zoom in) and segment jumps (zoom out)
+    if (pos && viewMode === 'world' && !isChatting && !this.manualCamera) {
+      const state = useStore.getState();
+      const tiles = state.boardTiles;
+      const worldSize = state.worldSize;
+      const halfWorld = worldSize / 2;
+      const tileSize = worldSize / 8;
+
+      let minDst = Infinity;
+      let nearestIdx = 0;
+      let nearestTile = null;
+
+      tiles.forEach((tile, index) => {
+        let x = 0, z = 0;
+        if (index < 8) { x = halfWorld - (index * tileSize); z = halfWorld; }
+        else if (index < 16) { x = -halfWorld; z = halfWorld - ((index - 8) * tileSize); }
+        else if (index < 24) { x = -halfWorld + ((index - 16) * tileSize); z = -halfWorld; }
+        else { x = halfWorld; z = -halfWorld + ((index - 24) * tileSize); }
+
+        const dst = Math.hypot(pos.x - x, pos.z - z);
+        if (dst < minDst) {
+          minDst = dst;
+          nearestIdx = index;
+          nearestTile = tile;
+        }
+      });
+
+      if (this.lastTileIndex !== nearestIdx && minDst < 3.2) {
+        this.lastTileIndex = nearestIdx;
+        this.jumpSegmentTimer = 50; // Zoom out when jumping to new segment
+      }
+
+      if (this.jumpSegmentTimer > 0) {
+        this.jumpSegmentTimer--;
+        this.stage.setTargetDistance(32); // Zoom out on segment jump
+      } else if (nearestTile && ((nearestTile.floors || 0) > 0 || (nearestTile.volumeScore ?? 50) >= 80)) {
+        this.stage.setTargetDistance(10); // Subtly zoom in on high-value skyscraper
+      } else {
+        this.stage.setTargetDistance(22); // Normal board follow distance
+      }
+    }
 
     // Update selected NPC screen position for UI bubble
     if (selectedNpcIndex !== null && viewMode === 'world') {
@@ -526,7 +586,9 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
     this.updateStats(time);
     this.updateSocialSimulation(delta);
     this.updateGameSimulation(delta);
-    this.board.update(useStore.getState().boardTiles);
+    this.weatherSystem.update();
+    this.particleBurstManager.update();
+    this.board.update(useStore.getState().boardTiles, useStore.getState().isHeatmapMode);
   }
 
   private updateGameSimulation(delta: number) {
@@ -537,6 +599,10 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
         // Randomly give some "trading profits"
         if (Math.random() > 0.95) {
           useStore.getState().updateBalance(i, Math.floor(Math.random() * 50));
+          const pos = this.characters.getCPUPosition(i);
+          if (pos) {
+            this.particleBurstManager.spawnBurst(pos.x, pos.y, pos.z, 'trade');
+          }
         }
         
         // Randomly buy properties if landing on them (simulated)
@@ -545,6 +611,10 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
           const tile = useStore.getState().boardTiles[randomTileIdx];
           if (tile.type === 'property') {
             useStore.getState().buyProperty(i, tile.id);
+            const pos = this.characters.getCPUPosition(i);
+            if (pos) {
+              this.particleBurstManager.spawnBurst(pos.x, pos.y, pos.z, 'property');
+            }
           }
         }
       }
@@ -555,8 +625,8 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
   private async updateSocialSimulation(delta: number) {
     this.socialTimer += delta;
     
-    // Every ~8 seconds, an agent goes live or posts
-    if (this.socialTimer > 8) {
+    // Every ~20 seconds, an agent goes live or posts
+    if (this.socialTimer > 20) {
       this.socialTimer = 0;
       
       const count = AGENTS.length; // Social simulation only for core agents
@@ -621,7 +691,7 @@ Include 2-3 relevant emojis. Be professional but "social media" savvy.`;
         }, 3000);
 
       } catch (error) {
-        console.error("Social simulation error:", error);
+        console.warn("[SceneManager] Social simulation note:", error);
       }
     }
   }
@@ -635,7 +705,7 @@ Include 2-3 relevant emojis. Be professional but "social media" savvy.`;
 
       useStore.getState().updatePerformance({
         fps,
-        drawCalls: info.render.drawCalls,
+        drawCalls: (info.render as { calls?: number; drawCalls?: number }).calls ?? (info.render as { calls?: number; drawCalls?: number }).drawCalls ?? 0,
         triangles: info.render.triangles,
         geometries: info.memory.geometries,
         textures: info.memory.textures,

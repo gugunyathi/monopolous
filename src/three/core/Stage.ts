@@ -12,6 +12,7 @@ export class Stage {
 
   private followTarget: THREE.Vector3 | null = null;
   private readonly defaultTarget = new THREE.Vector3(0, 0.8, 0);
+  private targetDistance = 38;
 
   constructor(rendererElement: HTMLElement) {
     this.scene = new THREE.Scene();
@@ -105,11 +106,23 @@ export class Stage {
     this.followTarget = pos ? pos.clone() : null;
   }
 
+  public setTargetDistance(dist: number) {
+    this.targetDistance = dist;
+  }
+
   public update() {
     const lerpTarget = this.followTarget
       ? new THREE.Vector3(this.followTarget.x, 0.8, this.followTarget.z)
       : this.defaultTarget;
     this.controls.target.lerp(lerpTarget, 0.06);
+
+    // Smooth camera distance controller for skyscrapers & segment jumps
+    const offset = new THREE.Vector3().subVectors(this.camera.position, this.controls.target);
+    const currentDist = offset.length();
+    const newDist = THREE.MathUtils.lerp(currentDist, this.targetDistance, 0.05);
+    offset.normalize().multiplyScalar(newDist);
+    this.camera.position.copy(this.controls.target).add(offset);
+
     this.controls.update();
   }
 }

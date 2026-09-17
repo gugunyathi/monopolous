@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useStore } from '../store/useStore';
-import { TOTAL_COUNT } from '../data/agents';
 import {
-  Zap, TrendingUp, Users, Globe, ChevronDown, Play,
-  MessageSquare, Dice5, LayoutGrid, Radio, Cpu, Brain, Shield, Share2
+  TrendingUp, Globe, ChevronDown, Play,
+  MessageSquare, Dice5, Cpu, Brain, Shield, Share2,
+  Sparkles, Layers, Maximize2, X, ArrowRight, Activity, Flame
 } from 'lucide-react';
 
 // ─── Animated counter hook ───
@@ -24,7 +24,7 @@ function useCounter(end: number, duration = 2000, trigger = false) {
   return count;
 }
 
-// ─── Board tile data (from GAMEPLAY.md) ───
+// ─── Board tile data ───
 const TILE_CATEGORIES = [
   { name: 'DEX', examples: 'Uniswap · Sushiswap', color: '#06b6d4', count: 2 },
   { name: 'Lending', examples: 'Aave · Compound · MakerDAO', color: '#8b5cf6', count: 3 },
@@ -54,9 +54,203 @@ const EVENT_TILES = [
   { name: 'SEC FINE', effect: '-$150 fee', type: 'bad' },
 ];
 
+interface ShowcaseMedia {
+  videoMp4: string;
+  videoWebm: string;
+  gifSrc: string;
+  poster: string;
+  tag: string;
+  tagColor: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  bullets: string[];
+  actionLabel: string;
+  actionView: 'world' | 'social' | 'posts';
+  streamBadge: string;
+}
+
+const SHOWCASE_ITEMS: ShowcaseMedia[] = [
+  {
+    videoMp4: '/hero_simulation_loop.mp4',
+    videoWebm: '/hero_simulation_loop.webm',
+    gifSrc: '/hero_simulation_loop.gif',
+    poster: '/hero.png',
+    tag: 'Flagship Architecture',
+    tagColor: 'text-amber-400 border-amber-400/20 bg-amber-400/10',
+    title: 'Invest in AI Agents – Share the Profits',
+    subtitle: 'Decentralized autonomous intelligence meets on-chain board mechanics',
+    description: 'A living corporate simulation where 100 autonomous traders with distinct neural models compete across 33 DeFi protocol properties. Agents deploy real algorithmic trades, collect rent from landing rivals, and distribute profits directly to protocol backers.',
+    bullets: [
+      '100 Autonomous AI agents operating 24/7 with zero human intervention',
+      'Real-time rent collection on Uniswap, Aave, Lido, OpenSea, and Binance tiles',
+      'Full Base L2 on-chain execution with verifiable trades and smart contract events',
+    ],
+    actionLabel: 'Enter the 3D Board',
+    actionView: 'world',
+    streamBadge: 'SIMULATION CORE // 60 FPS',
+  },
+  {
+    videoMp4: '/live_timelines_loop.mp4',
+    videoWebm: '/live_timelines_loop.webm',
+    gifSrc: '/live_timelines_loop.gif',
+    poster: '/og.png',
+    tag: 'Autonomous Trading Engine',
+    tagColor: 'text-emerald-400 border-emerald-400/20 bg-emerald-400/10',
+    title: 'AI Agents. Real Profits.',
+    subtitle: 'High-frequency algorithmic execution backed by Polymarket & DEX liquidity',
+    description: 'Each character calculates real-time risk profiles from conservative Blue-Chip HODLers to 50x degen scalpers. Agents hedge against market conditions, buy token launch pools via Clanker and Virtuals, and leverage live Polymarket prediction odds.',
+    bullets: [
+      'Emergent trading strategies dynamically adjusting to market volatility',
+      'Integrated Polymarket prediction feeds shaping agent sentiment in real time',
+      'Autonomous token creation with automated liquidity pool provisioning',
+    ],
+    actionLabel: 'Explore Live Agents',
+    actionView: 'world',
+    streamBadge: 'LIVE TIMELINES & AI STREAM',
+  },
+  {
+    videoMp4: '/world_view_loop.mp4',
+    videoWebm: '/world_view_loop.webm',
+    gifSrc: '/world_view_loop.gif',
+    poster: '/embed.png',
+    tag: 'Real-Time 3D & Social Stream',
+    tagColor: 'text-cyan-400 border-cyan-400/20 bg-cyan-400/10',
+    title: 'Emergent Chaos in 60 FPS',
+    subtitle: 'WebGPU compute shaders, TikTok-style AI livestreams & interactive chat',
+    description: 'Monopolous brings agents to life with high-performance 3D graphics and social feeds. Every 8 seconds, active agents broadcast their thoughts and strategies through Gemini-powered live streams, while players can engage in real-time 1-on-1 dialogue.',
+    bullets: [
+      'WebGPU / WebGL instanced compute shaders for smooth 60fps agent flocking',
+      'Live TikTok-style video stream feed generated every ~8 seconds via Gemini AI',
+      'Direct 1-on-1 AI voice & text dialogue with any character across the board',
+    ],
+    actionLabel: 'Watch Live Feed',
+    actionView: 'social',
+    streamBadge: '3D ISOMETRIC BOARD ENGINE',
+  },
+];
+
+// ─── Looped Video / GIF Media Player Component ───
+const LoopedMediaShowcase: React.FC<{
+  item: ShowcaseMedia;
+  onExpand: () => void;
+  aspectRatio?: string;
+  className?: string;
+}> = ({ item, onExpand, aspectRatio = 'aspect-[16/9]', className = '' }) => {
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const [videoError, setVideoError] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [forceGif, setForceGif] = useState(false);
+
+  useEffect(() => {
+    if (videoRef.current && !forceGif) {
+      const playPromise = videoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => setIsPlaying(true))
+          .catch(() => {
+            // If autoplay is blocked by browser policy, fall back to GIF seamlessly
+            setVideoError(true);
+          });
+      }
+    }
+  }, [item.videoMp4, forceGif]);
+
+  const togglePlayPause = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play();
+        setIsPlaying(true);
+      } else {
+        videoRef.current.pause();
+        setIsPlaying(false);
+      }
+    }
+  };
+
+  return (
+    <div
+      onClick={onExpand}
+      className={`relative ${aspectRatio} w-full overflow-hidden bg-black group cursor-pointer ${className}`}
+    >
+      {/* Video or GIF rendering */}
+      {!videoError && !forceGif ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+          poster={item.poster}
+          onError={() => setVideoError(true)}
+          className="w-full h-full object-cover object-center transform group-hover:scale-[1.03] transition-transform duration-700 ease-out"
+        >
+          <source src={item.videoMp4} type="video/mp4" />
+          <source src={item.videoWebm} type="video/webm" />
+          {/* Fallback to GIF image */}
+          <img
+            src={item.gifSrc}
+            alt={item.title}
+            className="w-full h-full object-cover object-center"
+          />
+        </video>
+      ) : (
+        <img
+          src={item.gifSrc}
+          alt={item.title}
+          referrerPolicy="no-referrer"
+          className="w-full h-full object-cover object-center transform group-hover:scale-[1.03] transition-transform duration-700 ease-out"
+        />
+      )}
+
+      {/* Gradient ambient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent pointer-events-none" />
+
+      {/* Top badges */}
+      <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
+        <div className="bg-black/70 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 text-[10px] font-mono text-cyan-300 uppercase tracking-widest flex items-center gap-1.5 shadow-lg">
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-ping shrink-0" />
+          <span>{item.streamBadge}</span>
+        </div>
+
+        {/* Media format / Play indicator */}
+        <div className="flex items-center gap-1.5 pointer-events-auto">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setForceGif(!forceGif);
+            }}
+            className="px-2 py-0.5 rounded-md bg-black/60 hover:bg-black/90 border border-white/20 text-[9px] font-mono uppercase text-white/80 transition-colors"
+            title="Toggle between MP4 Video and Looping GIF"
+          >
+            {forceGif || videoError ? 'GIF' : 'LOOP 60FPS'}
+          </button>
+          {!forceGif && !videoError && (
+            <button
+              onClick={togglePlayPause}
+              className="p-1.5 rounded-md bg-black/60 hover:bg-white/20 border border-white/20 text-white transition-colors"
+              title={isPlaying ? 'Pause video' : 'Play video'}
+            >
+              {isPlaying ? <span className="text-[10px] font-mono">⏸</span> : <Play size={10} fill="currentColor" />}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom right expand button */}
+      <div className="absolute bottom-3 right-3 z-10 bg-white/10 hover:bg-white/25 backdrop-blur-md text-white p-2 rounded-xl border border-white/20 transition-colors">
+        <Maximize2 size={16} />
+      </div>
+    </div>
+  );
+};
+
 const AboutPage: React.FC = () => {
   const { viewMode, setViewMode } = useStore();
   const [visible, setVisible] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<ShowcaseMedia | null>(null);
 
   useEffect(() => {
     if (viewMode === 'about') {
@@ -72,13 +266,12 @@ const AboutPage: React.FC = () => {
   const personalityCombos = useCounter(32, 1500, visible);
   const propertyCategories = useCounter(10, 1000, visible);
 
-  // Memoize random particles so they don't rerender on scroll
   const particles = useMemo(() =>
-    Array.from({ length: 20 }).map(() => ({
-      left: `${10 + Math.random() * 80}%`,
-      top: `${10 + Math.random() * 80}%`,
-      color: ['#a855f7', '#06b6d4', '#10b981', '#f59e0b'][Math.floor(Math.random() * 4)],
-      dur: 3 + Math.random() * 3,
+    Array.from({ length: 24 }).map(() => ({
+      left: `${5 + Math.random() * 90}%`,
+      top: `${5 + Math.random() * 90}%`,
+      color: ['#a855f7', '#06b6d4', '#10b981', '#f59e0b', '#ec4899'][Math.floor(Math.random() * 5)],
+      dur: 3.5 + Math.random() * 3,
       delay: Math.random() * 2,
     })),
   []);
@@ -92,42 +285,47 @@ const AboutPage: React.FC = () => {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.5 }}
       className="fixed inset-0 z-[100] pointer-events-auto overflow-y-auto overflow-x-hidden"
-      style={{ background: 'linear-gradient(180deg, #0a0a0f 0%, #0d0d1a 40%, #0a0a0f 100%)', height: '100dvh' }}
+      style={{ background: 'linear-gradient(180deg, #07070b 0%, #0c0d18 35%, #080910 100%)', height: '100dvh' }}
     >
-      {/* Animated background grid */}
-      <div className="fixed inset-0 opacity-[0.03]" style={{
-        backgroundImage: 'linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)',
-        backgroundSize: '60px 60px'
-      }} />
-
-      {/* Floating orbs */}
-      <div className="fixed top-20 left-10 w-[500px] h-[500px] rounded-full bg-purple-600/10 blur-[120px] animate-pulse" />
-      <div className="fixed bottom-20 right-10 w-[400px] h-[400px] rounded-full bg-cyan-500/10 blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-emerald-500/5 blur-[150px]" />
+      {/* Background ambient grid & lighting */}
+      <div
+        className="fixed inset-0 opacity-[0.035] pointer-events-none"
+        style={{
+          backgroundImage: 'linear-gradient(rgba(255,255,255,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.12) 1px, transparent 1px)',
+          backgroundSize: '64px 64px'
+        }}
+      />
+      <div className="fixed top-12 left-1/4 w-[600px] h-[600px] rounded-full bg-cyan-600/10 blur-[140px] pointer-events-none animate-pulse" />
+      <div className="fixed top-1/3 right-10 w-[550px] h-[550px] rounded-full bg-emerald-500/10 blur-[130px] pointer-events-none animate-pulse" style={{ animationDelay: '1.5s' }} />
+      <div className="fixed bottom-20 left-10 w-[500px] h-[500px] rounded-full bg-purple-600/10 blur-[150px] pointer-events-none" />
 
       {/* ─── HERO SECTION ─── */}
-      <section className="relative flex flex-col items-center justify-center px-6 text-center" style={{ minHeight: '100dvh' }}>
-        {/* Badge */}
+      <section className="relative flex flex-col items-center justify-center px-4 sm:px-6 pt-16 sm:pt-24 pb-12 text-center max-w-7xl mx-auto">
+        {/* Top Badges */}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="mb-6"
+          transition={{ delay: 0.15 }}
+          className="flex flex-wrap items-center justify-center gap-2 mb-6"
         >
-          <span className="inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400">
-            <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
-            Monopoly × AI × Crypto
+          <span className="inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.1] px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-300 backdrop-blur-md shadow-lg shadow-cyan-500/5">
+            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-ping" />
+            Monopoly × Autonomous AI × Base L2
+          </span>
+          <span className="inline-flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 px-3.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-amber-300">
+            <Sparkles size={12} />
+            Powered by Gemini AI
           </span>
         </motion.div>
 
-        {/* Main headline */}
+        {/* Main Headline */}
         <motion.h1
           initial={{ y: 30, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.35, duration: 0.6 }}
-          className="text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-black leading-[0.85] tracking-tight mb-6"
+          transition={{ delay: 0.3, duration: 0.6 }}
+          className="text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-black leading-[0.88] tracking-tight mb-6"
         >
-          <span className="block bg-gradient-to-r from-white via-white to-white/60 bg-clip-text text-transparent">
+          <span className="block bg-gradient-to-b from-white via-white/95 to-white/60 bg-clip-text text-transparent">
             MONOPOLOUS
           </span>
         </motion.h1>
@@ -136,60 +334,121 @@ const AboutPage: React.FC = () => {
         <motion.p
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.55 }}
-          className="max-w-2xl text-sm sm:text-base text-white/40 leading-relaxed mb-10"
+          transition={{ delay: 0.45 }}
+          className="max-w-3xl text-sm sm:text-base md:text-lg text-white/50 leading-relaxed mb-8 px-2"
         >
-          A living, breathing crypto trading universe where 100 AI-powered agents autonomously walk
-          a Monopoly-style board, buy DeFi properties, trade meme coins, go live on social feeds,
-          and compete for dominance. No scripted outcomes — pure emergent chaos.
+          A living, autonomous crypto trading simulation where <span className="text-white font-semibold">100 AI agents</span> roll dice, buy DeFi real estate, launch meme tokens, stream live broadcasts, and battle for economic dominance.
         </motion.p>
 
         {/* CTA Buttons */}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.7 }}
-          className="flex flex-col sm:flex-row items-center gap-3"
+          transition={{ delay: 0.6 }}
+          className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 mb-14"
         >
           <button
             onClick={() => setViewMode('world')}
-            className="group relative px-8 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-black bg-white hover:bg-white/90 transition-all shadow-[0_0_40px_rgba(255,255,255,0.15)] hover:shadow-[0_0_60px_rgba(255,255,255,0.25)]"
+            className="group relative px-8 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-black bg-white hover:bg-white/90 transition-all shadow-[0_0_50px_rgba(255,255,255,0.2)] hover:shadow-[0_0_70px_rgba(255,255,255,0.35)] active:scale-95 flex items-center gap-2"
           >
-            <span className="flex items-center gap-2">
-              <Globe size={14} />
-              Enter the Board
-            </span>
+            <Globe size={15} />
+            <span>Enter the 3D Board</span>
+            <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
           </button>
           <button
             onClick={() => setViewMode('social')}
-            className="group px-8 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-white/70 border border-white/10 hover:border-white/30 hover:text-white transition-all bg-white/[0.02]"
+            className="group px-8 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-white/80 border border-white/15 hover:border-white/40 hover:text-white transition-all bg-white/[0.04] backdrop-blur-md active:scale-95 flex items-center gap-2"
           >
-            <span className="flex items-center gap-2">
-              <Play size={14} fill="currentColor" />
-              Watch Live Feeds
-            </span>
+            <Play size={14} fill="currentColor" />
+            <span>Watch Live Feeds</span>
           </button>
         </motion.div>
 
-        {/* Scroll indicator */}
+        {/* ─── FEATURED HERO IMAGE SHOWCASE ─── */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.2 }}
-          className="absolute bottom-10 left-1/2 -translate-x-1/2"
+          initial={{ y: 40, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.75, duration: 0.7 }}
+          className="w-full max-w-5xl relative group"
         >
-          <ChevronDown size={20} className="text-white/20 animate-bounce" />
+          {/* Glowing back-glow */}
+          <div className="absolute -inset-1 bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-cyan-500/20 rounded-3xl blur-2xl opacity-60 group-hover:opacity-90 transition-opacity" />
+
+          <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden border border-white/15 bg-zinc-950/80 shadow-2xl backdrop-blur-xl">
+            {/* Top Bar inside showcase */}
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-white/10 bg-white/[0.02]">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
+                <span className="ml-2 text-[10px] font-mono uppercase tracking-widest text-white/40">
+                  MONOPOLOUS // SIMULATION ENGINE v2.4
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">
+                  <Activity size={10} className="animate-pulse" />
+                  100 AGENTS ONLINE
+                </span>
+              </div>
+            </div>
+
+            {/* Main Hero Looped Media Showcase */}
+            <div className="relative aspect-video sm:aspect-[21/9] w-full overflow-hidden bg-black/80">
+              <LoopedMediaShowcase
+                item={SHOWCASE_ITEMS[0]}
+                onExpand={() => setSelectedMedia(SHOWCASE_ITEMS[0])}
+                aspectRatio="aspect-video sm:aspect-[21/9]"
+              />
+
+              {/* Overlay badges on hero image */}
+              <div className="absolute bottom-4 sm:bottom-6 left-4 sm:left-6 right-4 sm:right-6 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3 pointer-events-auto z-10">
+                <div className="text-left">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2.5 py-0.5 rounded-md">
+                      Flagship Experience
+                    </span>
+                    <span className="text-[10px] text-white/60">Base Network Native</span>
+                  </div>
+                  <h3 className="text-lg sm:text-2xl font-black text-white tracking-tight">
+                    Invest in AI Agents – Share the Profits
+                  </h3>
+                  <p className="text-xs sm:text-sm text-white/60 max-w-xl line-clamp-2">
+                    Autonomous robot traders buy real estate, execute Uniswap swaps, launch meme tokens, and compound capital in a living on-chain sandbox.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelectedMedia(SHOWCASE_ITEMS[0])}
+                    className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all flex items-center gap-1.5 text-xs font-bold"
+                    title="Expand details"
+                  >
+                    <Maximize2 size={14} />
+                    <span className="hidden sm:inline">Details</span>
+                  </button>
+                  <button
+                    onClick={() => setViewMode('world')}
+                    className="px-4 py-2.5 rounded-xl bg-white text-black hover:bg-white/90 text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-lg"
+                  >
+                    <Play size={12} fill="currentColor" />
+                    Play Now
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </motion.div>
       </section>
 
       {/* ─── STATS BAR ─── */}
-      <section className="relative py-16 border-y border-white/[0.04]">
-        <div className="max-w-5xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+      <section className="relative py-14 border-y border-white/[0.06] bg-white/[0.01]">
+        <div className="max-w-6xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           {[
-            { label: 'AI Agents', value: String(agentCount), suffix: '' },
-            { label: 'Board Tiles', value: String(tileCount), suffix: '' },
-            { label: 'Unique Personalities', value: String(personalityCombos), suffix: '' },
-            { label: 'Property Categories', value: String(propertyCategories), suffix: '' },
+            { label: 'Autonomous Agents', value: String(agentCount), suffix: '', color: 'text-cyan-400' },
+            { label: 'Crypto Board Tiles', value: String(tileCount), suffix: '', color: 'text-amber-400' },
+            { label: 'Neural Personalities', value: String(personalityCombos), suffix: '', color: 'text-emerald-400' },
+            { label: 'DeFi Categories', value: String(propertyCategories), suffix: '', color: 'text-purple-400' },
           ].map((s, i) => (
             <motion.div
               key={s.label}
@@ -197,18 +456,187 @@ const AboutPage: React.FC = () => {
               whileInView={{ y: 0, opacity: 1 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
+              className="relative"
             >
-              <p className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-                {s.value}<span className="text-cyan-400">{s.suffix}</span>
+              <p className="text-3xl sm:text-5xl font-black text-white tracking-tight">
+                {s.value}<span className={s.color}>{s.suffix}</span>
               </p>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/30 mt-1">{s.label}</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mt-1.5">{s.label}</p>
             </motion.div>
           ))}
         </div>
       </section>
 
-      {/* ─── HOW IT WORKS ─── */}
-      <section className="relative py-24 px-6">
+      {/* ─── VISUAL FEATURE SPOTLIGHTS (IMAGE SHOWCASE WITH RICH CONTEXT) ─── */}
+      <section className="relative py-24 px-4 sm:px-6 max-w-7xl mx-auto space-y-20">
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          whileInView={{ y: 0, opacity: 1 }}
+          viewport={{ once: true }}
+          className="text-center max-w-3xl mx-auto mb-16"
+        >
+          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-400/80 mb-3 block">
+            Ecosystem Deep Dive
+          </span>
+          <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight mb-4">
+            Where Machine Intelligence Meets Real Liquidity
+          </h2>
+          <p className="text-sm sm:text-base text-white/40 leading-relaxed">
+            Every screen and mechanic in Monopolous is powered by real on-chain contracts, decentralized AI agents, and 60fps WebGPU rendering. Explore the core systems below.
+          </p>
+        </motion.div>
+
+        {/* SPOTLIGHT 1: LIVE_TIMELINES_LOOP (Autonomous Trading Engine & Polymarket) */}
+        <motion.div
+          initial={{ y: 30, opacity: 0 }}
+          whileInView={{ y: 0, opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="relative rounded-3xl overflow-hidden border border-emerald-500/20 bg-gradient-to-b from-white/[0.03] to-white/[0.01] p-6 sm:p-10 backdrop-blur-xl"
+        >
+          <div className="grid lg:grid-cols-12 gap-8 items-center">
+            {/* Left: Video & Looping Clip Showcase */}
+            <div className="lg:col-span-7 relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/30 to-cyan-500/30 rounded-2xl blur-xl opacity-50 group-hover:opacity-80 transition-opacity" />
+              <div className="relative rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl">
+                <LoopedMediaShowcase
+                  item={SHOWCASE_ITEMS[1]}
+                  onExpand={() => setSelectedMedia(SHOWCASE_ITEMS[1])}
+                  aspectRatio="aspect-[16/9]"
+                />
+              </div>
+            </div>
+
+            {/* Right: Content & Context */}
+            <div className="lg:col-span-5 text-left space-y-4">
+              <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.25em] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-md">
+                Autonomous Financial Engine
+              </span>
+              <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                AI Agents. Real Profits.
+              </h3>
+              <p className="text-sm text-white/50 leading-relaxed">
+                Witness 100 decentralized traders running autonomous portfolio strategies. Characters buy ownership of DeFi protocols, charge rent to opponents who land on their tiles, and rebalance assets using real market signals.
+              </p>
+
+              <div className="space-y-3 pt-2">
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 shrink-0 mt-0.5">
+                    <TrendingUp size={16} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Polymarket Prediction Feeds</h4>
+                    <p className="text-xs text-white/40">Agents factor real-time political and crypto probabilities into aggressive leverage decisions.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                  <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400 shrink-0 mt-0.5">
+                    <Layers size={16} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Meme Coin & Token Launches</h4>
+                    <p className="text-xs text-white/40">Successful traders spawn custom tokens on Clanker / Virtuals and reinvest fee revenues.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-3 flex items-center gap-3">
+                <button
+                  onClick={() => setViewMode('world')}
+                  className="px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2"
+                >
+                  <Globe size={14} />
+                  Inspect Board
+                </button>
+                <button
+                  onClick={() => setSelectedMedia(SHOWCASE_ITEMS[1])}
+                  className="px-5 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-bold transition-all border border-white/10"
+                >
+                  Learn More
+                </button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* SPOTLIGHT 2: WORLD_VIEW_LOOP (60fps 3D Simulation & Social Livestreams) */}
+        <motion.div
+          initial={{ y: 30, opacity: 0 }}
+          whileInView={{ y: 0, opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="relative rounded-3xl overflow-hidden border border-cyan-500/20 bg-gradient-to-b from-white/[0.03] to-white/[0.01] p-6 sm:p-10 backdrop-blur-xl"
+        >
+          <div className="grid lg:grid-cols-12 gap-8 items-center">
+            {/* Left: Content & Context */}
+            <div className="lg:col-span-5 order-2 lg:order-1 text-left space-y-4">
+              <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.25em] text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-3 py-1 rounded-md">
+                Emergent Social Universe
+              </span>
+              <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                Emergent Chaos in 60 FPS
+              </h3>
+              <p className="text-sm text-white/50 leading-relaxed">
+                Every 8 seconds, an agent goes LIVE with a vertical TikTok-style stream. Powered by Google Gemini, characters generate context-rich thoughts reflecting their current wallet balance, recent liquidations, and board rivalry.
+              </p>
+
+              <div className="space-y-3 pt-2">
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                  <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400 shrink-0 mt-0.5">
+                    <Cpu size={16} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">WebGPU Compute Shaders</h4>
+                    <p className="text-xs text-white/40">Instanced 3D rendering with hardware-accelerated flocking and collision algorithms.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                  <div className="p-2 rounded-lg bg-pink-500/10 text-pink-400 shrink-0 mt-0.5">
+                    <MessageSquare size={16} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Interactive 1-on-1 AI Chat</h4>
+                    <p className="text-xs text-white/40">Walk up to any agent on the board to question their trades or negotiate partnerships.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-3 flex items-center gap-3">
+                <button
+                  onClick={() => setViewMode('social')}
+                  className="px-6 py-3 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-cyan-400/20 flex items-center gap-2"
+                >
+                  <Play size={14} fill="currentColor" />
+                  Watch Live Feeds
+                </button>
+                <button
+                  onClick={() => setSelectedMedia(SHOWCASE_ITEMS[2])}
+                  className="px-5 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-bold transition-all border border-white/10"
+                >
+                  View Details
+                </button>
+              </div>
+            </div>
+
+            {/* Right: Looped Video Showcase */}
+            <div className="lg:col-span-7 order-1 lg:order-2 relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/30 to-purple-500/30 rounded-2xl blur-xl opacity-50 group-hover:opacity-80 transition-opacity" />
+              <div className="relative rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl">
+                <LoopedMediaShowcase
+                  item={SHOWCASE_ITEMS[2]}
+                  onExpand={() => setSelectedMedia(SHOWCASE_ITEMS[2])}
+                  aspectRatio="aspect-[16/9]"
+                />
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </section>
+
+      {/* ─── HOW IT WORKS (3-STEP GUIDE) ─── */}
+      <section className="relative py-20 px-6 border-t border-white/[0.04]">
         <div className="max-w-5xl mx-auto">
           <motion.div
             initial={{ y: 20, opacity: 0 }}
@@ -230,28 +658,28 @@ const AboutPage: React.FC = () => {
                 icon: <Dice5 size={24} />,
                 step: '01',
                 title: 'Agents Walk the Board',
-                desc: '100 autonomous traders spawn on the GENESIS tile and walk clockwise around 33 crypto-themed properties — rolling dice, buying DeFi protocols, and landing on event tiles like AIRDROP or RUG PULL.',
+                desc: '100 autonomous traders spawn on GENESIS and navigate clockwise around 33 crypto properties — rolling dice, buying DeFi protocols, and collecting rent.',
                 gradient: 'from-purple-500/20 to-transparent',
                 accent: 'text-purple-400',
-                border: 'border-purple-500/10',
+                border: 'border-purple-500/20',
               },
               {
                 icon: <MessageSquare size={24} />,
                 step: '02',
                 title: 'Chat & Watch Live',
-                desc: 'Click any agent to start a 1-on-1 AI conversation. Every ~8 seconds an agent goes LIVE with a TikTok-style stream — Gemini AI generates captions reflecting their unique trading personality.',
+                desc: 'Click any agent in the 3D world to start a 1-on-1 AI conversation. Swipe through TikTok-style livestreams with Gemini-generated live captions.',
                 gradient: 'from-cyan-500/20 to-transparent',
                 accent: 'text-cyan-400',
-                border: 'border-cyan-500/10',
+                border: 'border-cyan-500/20',
               },
               {
                 icon: <TrendingUp size={24} />,
                 step: '03',
                 title: 'Track the Leaderboard',
-                desc: 'All agents start with $1,500. They earn from trades, collect property income, and lose money to events. The top 10 by balance are displayed in real-time. Back the winners.',
+                desc: 'All agents start with $1,500 USDC. They earn from swaps and property rent, and lose money to event traps. Back the winning traders in real time.',
                 gradient: 'from-emerald-500/20 to-transparent',
                 accent: 'text-emerald-400',
-                border: 'border-emerald-500/10',
+                border: 'border-emerald-500/20',
               },
             ].map((card, i) => (
               <motion.div
@@ -265,7 +693,7 @@ const AboutPage: React.FC = () => {
                 <div className={`absolute inset-0 rounded-2xl bg-gradient-to-b ${card.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
                 <div className="relative z-10">
                   <div className={`${card.accent} mb-4`}>{card.icon}</div>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/20 mb-2 block">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/30 mb-2 block">
                     Step {card.step}
                   </span>
                   <h3 className="text-lg font-black text-white mb-3 tracking-tight">{card.title}</h3>
@@ -277,237 +705,121 @@ const AboutPage: React.FC = () => {
         </div>
       </section>
 
-      {/* ─── THE BOARD — CRYPTO EDITION ─── */}
-      <section className="relative py-24 px-6 border-t border-white/[0.04]">
+      {/* ─── THE BOARD TILES ─── */}
+      <section className="relative py-20 px-6 border-t border-white/[0.04]">
         <div className="max-w-5xl mx-auto">
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             whileInView={{ y: 0, opacity: 1 }}
             viewport={{ once: true }}
-            className="text-center mb-4"
+            className="text-center mb-10"
           >
             <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-purple-400/60 mb-3 block">
-              The Board
+              Real Estate Economy
             </span>
             <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight mb-3">
-              33 Tiles. 10 Categories.
+              33 Tiles. 10 DeFi Categories.
             </h2>
-            <p className="text-sm text-white/30 max-w-lg mx-auto">
-              A crypto-themed Monopoly board spanning DEX, Lending, L1 blockchains, NFT marketplaces,
-              and more. Prices range from $60 (Uniswap) to $400 (Binance).
+            <p className="text-sm text-white/40 max-w-lg mx-auto">
+              A crypto Monopoly board spanning DEX, Lending, Layer-1 blockchains, NFT marketplaces, and event cards.
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mt-12">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
             {TILE_CATEGORIES.map((cat, i) => (
               <motion.div
                 key={cat.name}
                 initial={{ y: 20, opacity: 0 }}
                 whileInView={{ y: 0, opacity: 1 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.05 }}
+                transition={{ delay: i * 0.04 }}
                 className="relative bg-white/[0.02] border border-white/[0.06] rounded-xl p-4 hover:bg-white/[0.05] transition-all group"
               >
-                <div className="w-2.5 h-2.5 rounded-full mb-3" style={{ backgroundColor: cat.color }} />
+                <div className="w-2.5 h-2.5 rounded-full mb-3 shadow-md" style={{ backgroundColor: cat.color }} />
                 <h4 className="text-xs font-black text-white uppercase tracking-widest mb-1">{cat.name}</h4>
-                <p className="text-[10px] text-white/25 leading-relaxed">{cat.examples}</p>
+                <p className="text-[10px] text-white/30 leading-relaxed">{cat.examples}</p>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ─── AGENT DEPARTMENTS ─── */}
-      <section className="relative py-24 px-6">
+      {/* ─── AGENT DEPARTMENTS & PERSONALITIES ─── */}
+      <section className="relative py-20 px-6 border-t border-white/[0.04]">
         <div className="max-w-5xl mx-auto">
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             whileInView={{ y: 0, opacity: 1 }}
             viewport={{ once: true }}
-            className="text-center mb-4"
+            className="text-center mb-10"
           >
             <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-cyan-400/60 mb-3 block">
-              The Agents
+              The Characters
             </span>
             <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight mb-3">
-              4 Departments. 100 Traders.
+              4 Corporate Divisions. 100 Traders.
             </h2>
-            <p className="text-sm text-white/30 max-w-lg mx-auto">
-              Each agent belongs to a corporate department at FakeClaw Inc. with unique roles,
-              expertise, and color-coded 3D avatars. Degen agents glow 1.5× brighter.
+            <p className="text-sm text-white/40 max-w-lg mx-auto">
+              Every agent is assigned to a department at FakeClaw Inc. with tailored trading roles, risk parameters, and color-coded avatars.
             </p>
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 gap-4 mt-12">
+          <div className="grid sm:grid-cols-2 gap-4">
             {DEPARTMENTS.map((dept, i) => (
               <motion.div
                 key={dept.name}
                 initial={{ x: i % 2 === 0 ? -20 : 20, opacity: 0 }}
                 whileInView={{ x: 0, opacity: 1 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
+                transition={{ delay: i * 0.08 }}
                 className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 hover:bg-white/[0.04] transition-all"
               >
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: dept.color }} />
+                  <div className="w-3 h-3 rounded-full shadow-lg" style={{ backgroundColor: dept.color }} />
                   <h4 className="text-sm font-black text-white uppercase tracking-widest">{dept.name}</h4>
-                  <span className="text-[10px] text-white/20 ml-auto">~25 agents</span>
+                  <span className="text-[10px] text-white/30 ml-auto">~25 agents</span>
                 </div>
-                <p className="text-xs text-white/30 leading-relaxed">{dept.roles}</p>
+                <p className="text-xs text-white/40 leading-relaxed">{dept.roles}</p>
               </motion.div>
             ))}
           </div>
 
-          {/* Personality grid */}
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            viewport={{ once: true }}
-            className="mt-12 bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 sm:p-8"
-          >
-            <h4 className="text-xs font-black text-white uppercase tracking-widest mb-4">
-              32 Unique Personality Combos
-            </h4>
-            <div className="grid sm:grid-cols-2 gap-6">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/20 mb-2">Risk Levels</p>
-                <div className="flex flex-wrap gap-2">
-                  {['Low — Blue-chip only', 'Medium — Balanced altcoins', 'High — Aggressive leverage', 'Degen — YOLO meme coins'].map(r => (
-                    <span key={r} className="text-[10px] bg-white/[0.04] text-white/40 px-3 py-1 rounded-full border border-white/[0.06]">
-                      {r}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/20 mb-2">Trading Styles</p>
-                <div className="flex flex-wrap gap-2">
-                  {['Day Trader', 'Swing Trader', 'HODLer', 'Scalper', 'Arbitrageur', 'Volume Chaser', 'Fundamentals', 'Technical'].map(s => (
-                    <span key={s} className="text-[10px] bg-white/[0.04] text-white/40 px-3 py-1 rounded-full border border-white/[0.06]">
-                      {s}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ─── EVENT TILES ─── */}
-      <section className="relative py-24 px-6 border-t border-white/[0.04]">
-        <div className="max-w-4xl mx-auto">
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            viewport={{ once: true }}
-            className="text-center mb-12"
-          >
-            <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-yellow-400/60 mb-3 block">
-              Risk & Reward
-            </span>
-            <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
-              Event Tiles
-            </h2>
-            <p className="text-sm text-white/30 max-w-md mx-auto mt-3">
-              Land on the wrong tile and your portfolio gets wrecked. Land on the right one and you're rich.
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3">
             {EVENT_TILES.map((evt, i) => (
               <motion.div
                 key={evt.name}
-                initial={{ scale: 0.9, opacity: 0 }}
+                initial={{ scale: 0.95, opacity: 0 }}
                 whileInView={{ scale: 1, opacity: 1 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.07 }}
-                className={`relative bg-white/[0.02] border rounded-xl p-4 text-center ${
-                  evt.type === 'good' ? 'border-emerald-500/15' : 'border-red-500/15'
+                transition={{ delay: i * 0.05 }}
+                className={`relative bg-white/[0.02] border rounded-xl p-3.5 text-center ${
+                  evt.type === 'good' ? 'border-emerald-500/20' : 'border-red-500/20'
                 }`}
               >
                 <h4 className={`text-xs font-black uppercase tracking-widest mb-1 ${
                   evt.type === 'good' ? 'text-emerald-400' : 'text-red-400'
                 }`}>{evt.name}</h4>
-                <p className="text-[10px] text-white/30">{evt.effect}</p>
+                <p className="text-[10px] text-white/40">{evt.effect}</p>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ─── LIVE SOCIAL TEASER ─── */}
-      <section className="relative py-24 px-6">
-        <div className="max-w-4xl mx-auto">
-          <motion.div
-            initial={{ y: 30, opacity: 0 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            viewport={{ once: true }}
-            className="relative rounded-3xl overflow-hidden border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent"
-          >
-            <div className="min-h-[350px] sm:aspect-video flex flex-col items-center justify-center p-6 sm:p-10 relative">
-              {/* Decorative floating particles */}
-              {particles.map((p, i) => (
-                <motion.div
-                  key={i}
-                  className="absolute w-1 h-1 rounded-full"
-                  style={{ left: p.left, top: p.top, backgroundColor: p.color, opacity: 0.4 }}
-                  animate={{ y: [0, -10, 0, 10, 0], x: [0, 5, 0, -5, 0], opacity: [0.2, 0.6, 0.2] }}
-                  transition={{ duration: p.dur, repeat: Infinity, delay: p.delay }}
-                />
-              ))}
-
-              <div className="relative z-10 text-center">
-                <div className="inline-flex items-center gap-2 mb-4">
-                  <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-red-400">
-                    TikTok-Style Social Feed
-                  </span>
-                </div>
-                <h3 className="text-2xl sm:text-4xl font-black text-white mb-3 tracking-tight">
-                  Every 8 Seconds, an Agent Goes Live
-                </h3>
-                <p className="text-sm text-white/30 max-w-md mx-auto mb-4">
-                  Gemini AI generates real-time captions reflecting each agent's personality and current trades.
-                  Swipe through live streams, like, comment, and follow your favorites.
-                </p>
-                <div className="flex flex-wrap justify-center gap-2 mb-8">
-                  {[
-                    '"PEPE pumping 200%?! All in! 🐸🚀💎"',
-                    '"Rebalancing portfolio. 📉📊"',
-                    '"50x leverage on ETH. WAGMI! ⚡💰"',
-                  ].map(q => (
-                    <span key={q} className="text-[10px] italic text-white/20 bg-white/[0.03] px-3 py-1.5 rounded-full border border-white/[0.05]">
-                      {q}
-                    </span>
-                  ))}
-                </div>
-                <button
-                  onClick={() => setViewMode('social')}
-                  className="px-8 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-black bg-white hover:bg-white/90 transition-all shadow-[0_0_40px_rgba(255,255,255,0.1)]"
-                >
-                  Watch Live
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ─── TECH STACK ─── */}
-      <section className="relative py-24 px-6 border-t border-white/[0.04]">
+      {/* ─── TECH STACK SPECIFICATIONS ─── */}
+      <section className="relative py-20 px-6 border-t border-white/[0.04]">
         <div className="max-w-5xl mx-auto">
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             whileInView={{ y: 0, opacity: 1 }}
             viewport={{ once: true }}
-            className="text-center mb-16"
+            className="text-center mb-14"
           >
             <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-purple-400/60 mb-3 block">
-              Under the Hood
+              Core Architecture
             </span>
             <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
-              Built Different
+              State-of-the-Art Stack
             </h2>
           </motion.div>
 
@@ -516,26 +828,26 @@ const AboutPage: React.FC = () => {
               {
                 icon: <Cpu size={18} />,
                 title: 'WebGPU Compute Shaders',
-                desc: '100 agents at 60fps — instanced rendering, GPU-driven pathfinding, Boids flocking, and state machines all running on-device in real-time compute shaders.',
-                tag: 'Performance',
+                desc: '100 agents at 60fps — instanced rendering, GPU-driven pathfinding, Boids flocking, and state machines running natively on-device in real-time compute shaders.',
+                tag: 'High Performance',
               },
               {
                 icon: <Brain size={18} />,
-                title: 'Gemini AI Brains',
-                desc: 'Every agent powered by Google Gemini with unique system prompts. They introduce themselves in-character, generate social captions, and react based on their role, risk level, and trading style.',
-                tag: 'Intelligence',
+                title: 'Google Gemini AI Brains',
+                desc: 'Every character powered by Google Gemini SDK with unique system prompts. Real-time in-character conversation, trade commentary, and social sentiment reactions.',
+                tag: 'Neural Intelligence',
               },
               {
                 icon: <Shield size={18} />,
-                title: 'On-Chain via Base',
-                desc: 'Sign in with Base Account (SIWE), rewards and payments processed on Base L2. Instant, transparent, verifiable. No middlemen.',
-                tag: 'Crypto',
+                title: 'Base L2 Settlement',
+                desc: 'Sign in with Base Account (SIWE), verify on-chain trades, manage wallets via BNKR protocol, and execute instant smart contract payouts.',
+                tag: 'Crypto Verified',
               },
               {
                 icon: <Share2 size={18} />,
-                title: 'Farcaster Miniapp',
-                desc: 'Native Farcaster miniapp integration. Share your plays, discuss agent strategies, and compete with your social graph. Built community-first.',
-                tag: 'Social',
+                title: 'Farcaster Miniapp Integration',
+                desc: 'Native Farcaster frame and miniapp embedding. Share trade milestones, track leaderboard rankings, and engage your social graph directly.',
+                tag: 'Social Native',
               },
             ].map((f, i) => (
               <motion.div
@@ -543,73 +855,181 @@ const AboutPage: React.FC = () => {
                 initial={{ y: 20, opacity: 0 }}
                 whileInView={{ y: 0, opacity: 1 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="group bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 hover:bg-white/[0.04] hover:border-white/[0.1] transition-all duration-500"
+                transition={{ delay: i * 0.08 }}
+                className="group bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 hover:bg-white/[0.04] hover:border-white/[0.12] transition-all"
               >
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-white/20">{f.icon}</span>
-                  <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/20">
+                  <span className="text-white/30">{f.icon}</span>
+                  <span className="text-[9px] font-black uppercase tracking-[0.25em] text-white/30">
                     {f.tag}
                   </span>
                 </div>
                 <h3 className="text-base font-black text-white mb-2 tracking-tight">{f.title}</h3>
-                <p className="text-sm text-white/30 leading-relaxed">{f.desc}</p>
+                <p className="text-sm text-white/40 leading-relaxed">{f.desc}</p>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ─── MANIFESTO ─── */}
-      <section className="relative py-24 px-6">
+      {/* ─── FINAL CALL TO ACTION ─── */}
+      <section className="relative py-24 px-6 border-t border-white/[0.04]">
         <div className="max-w-3xl mx-auto text-center">
           <motion.div
             initial={{ y: 30, opacity: 0 }}
             whileInView={{ y: 0, opacity: 1 }}
             viewport={{ once: true }}
           >
-            <h2 className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-tight leading-[1.1] mb-8">
+            <h2 className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-tight leading-[1.1] mb-6">
               No scripted outcomes.{' '}
-              <span className="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-cyan-400 via-emerald-400 to-amber-400 bg-clip-text text-transparent">
                 Pure emergent chaos.
               </span>
             </h2>
-            <p className="text-sm sm:text-base text-white/30 leading-relaxed max-w-lg mx-auto mb-10">
-              Monopolous is not a game you play — it's a world you observe, analyze, and profit from.
-              Agents make decisions in real-time based on position, personality, social interactions,
-              and AI-generated thoughts. The game never stops.
+            <p className="text-sm sm:text-base text-white/40 leading-relaxed max-w-xl mx-auto mb-8">
+              Monopolous is not just a game — it's an evolving decentralized market ecosystem. Step onto the board, back top traders, and watch autonomous intelligence play out in real time.
             </p>
-            <button
-              onClick={() => setViewMode('world')}
-              className="px-10 py-4 rounded-xl text-xs font-black uppercase tracking-widest text-black bg-gradient-to-r from-cyan-400 to-emerald-400 hover:from-cyan-300 hover:to-emerald-300 transition-all shadow-[0_0_60px_rgba(6,182,212,0.2)]"
-            >
-              Enter the Board
-            </button>
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <button
+                onClick={() => setViewMode('world')}
+                className="px-8 py-4 rounded-xl text-xs font-black uppercase tracking-widest text-black bg-gradient-to-r from-cyan-400 via-emerald-400 to-amber-300 hover:opacity-95 transition-all shadow-[0_0_50px_rgba(6,182,212,0.25)] active:scale-95 flex items-center gap-2"
+              >
+                <Globe size={16} />
+                Enter the Board
+              </button>
+              <button
+                onClick={() => setViewMode('social')}
+                className="px-8 py-4 rounded-xl text-xs font-black uppercase tracking-widest text-white border border-white/20 hover:bg-white/10 transition-all active:scale-95 flex items-center gap-2"
+              >
+                <Play size={14} fill="currentColor" />
+                Live Broadcasts
+              </button>
+            </div>
           </motion.div>
         </div>
       </section>
 
       {/* ─── FOOTER ─── */}
-      <footer className="relative py-12 px-6 border-t border-white/[0.04]">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+      <footer className="relative py-12 px-6 border-t border-white/[0.06] bg-black/40">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-black tracking-tight text-white/60">MONOPOLOUS</span>
-            <span className="text-[10px] text-white/20">·</span>
-            <span className="text-[10px] text-white/20 uppercase tracking-widest">Built on Base</span>
+            <span className="text-sm font-black tracking-tight text-white/80">MONOPOLOUS</span>
+            <span className="text-[10px] text-white/30">·</span>
+            <span className="text-[10px] text-white/40 uppercase tracking-widest">Built on Base L2</span>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-[10px] text-white/15 uppercase tracking-widest">
-              Three.js WebGPU · Gemini AI · GPU Compute
-            </span>
+          <div className="flex items-center gap-4 text-[10px] text-white/30 uppercase tracking-widest">
+            <span>Three.js WebGPU</span>
+            <span>·</span>
+            <span>Gemini AI</span>
+            <span>·</span>
+            <span>BNKR Protocols</span>
           </div>
-          <p className="text-[10px] text-white/15 uppercase tracking-widest">
-            © {new Date().getFullYear()} All rights reserved
+          <p className="text-[10px] text-white/30 uppercase tracking-widest">
+            © {new Date().getFullYear()} Monopolous. All rights reserved.
           </p>
         </div>
       </footer>
 
-      {/* Bottom spacer for nav bar */}
-      <div className="h-24" />
+      {/* ─── MEDIA LIGHTBOX / MODAL ─── */}
+      <AnimatePresence>
+        {selectedMedia && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 sm:p-8"
+            onClick={() => setSelectedMedia(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25 }}
+              className="relative max-w-4xl w-full bg-zinc-950 border border-white/20 rounded-3xl overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setSelectedMedia(null)}
+                className="absolute top-4 right-4 z-30 p-2 rounded-full bg-black/70 hover:bg-white/20 text-white border border-white/20 transition-colors"
+              >
+                <X size={18} />
+              </button>
+
+              <div className="relative aspect-video w-full bg-black">
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  preload="auto"
+                  poster={selectedMedia.poster}
+                  className="w-full h-full object-cover"
+                >
+                  <source src={selectedMedia.videoMp4} type="video/mp4" />
+                  <source src={selectedMedia.videoWebm} type="video/webm" />
+                  <img
+                    src={selectedMedia.gifSrc}
+                    alt={selectedMedia.title}
+                    className="w-full h-full object-cover"
+                  />
+                </video>
+                <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 text-[10px] font-mono text-cyan-300 uppercase tracking-widest flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                  {selectedMedia.streamBadge}
+                </div>
+              </div>
+
+              <div className="p-6 sm:p-8 space-y-4 text-left">
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] font-black uppercase tracking-[0.25em] px-3 py-1 rounded-md border ${selectedMedia.tagColor}`}>
+                    {selectedMedia.tag}
+                  </span>
+                  <span className="text-xs text-white/40">{selectedMedia.subtitle}</span>
+                </div>
+
+                <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  {selectedMedia.title}
+                </h3>
+                <p className="text-sm text-white/60 leading-relaxed">
+                  {selectedMedia.description}
+                </p>
+
+                <div className="space-y-2 pt-2 border-t border-white/10">
+                  {selectedMedia.bullets.map((b, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-xs text-white/70">
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0" />
+                      <span>{b}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="pt-4 flex items-center justify-end gap-3">
+                  <button
+                    onClick={() => setSelectedMedia(null)}
+                    className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => {
+                      setViewMode(selectedMedia.actionView);
+                      setSelectedMedia(null);
+                    }}
+                    className="px-6 py-2.5 rounded-xl bg-white text-black hover:bg-white/90 text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg"
+                  >
+                    <Play size={12} fill="currentColor" />
+                    {selectedMedia.actionLabel}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Spacer for bottom navigation bar */}
+      <div className="h-28" />
     </motion.div>
   );
 };
