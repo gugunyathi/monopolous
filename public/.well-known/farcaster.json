@@ -1,0 +1,31 @@
+{
+  "accountAssociation": {
+    "header": "eyJmaWQiOjEwNDEzMjQsInR5cGUiOiJhdXRoIiwia2V5IjoiMHhkNGYxODM5NzQ3M2E3MDhGM0U5MjEzRDlFM0E2OEUxYTI5MjM4YzY2In0",
+    "payload": "eyJkb21haW4iOiJtb25vcG9sb3VzLnZlcmNlbC5hcHAifQ",
+    "signature": "5uUjDhFpPp3FJIJ6YuvVkEt5EWZd3cHiPpUuEc8iiTwVSIfIIpcklXCrQvsWV6ndBHhJ+Gk+Xk5U2jqlz033whs="
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "Monopolous",
+    "homeUrl": "https://monopolous.vercel.app",
+    "iconUrl": "https://monopolous.vercel.app/icon.png",
+    "splashImageUrl": "https://monopolous.vercel.app/splash.png",
+    "splashBackgroundColor": "#000000",
+    "webhookUrl": "https://monopolous.vercel.app/api/webhook",
+    "subtitle": "AI-powered board game",
+    "description": "A high-performance 3D corporate simulation featuring autonomous agents powered by Gemini AI and WebGPU compute shaders.",
+    "screenshotUrls": [
+      "https://monopolous.vercel.app/screenshot1.png",
+      "https://monopolous.vercel.app/screenshot2.png",
+      "https://monopolous.vercel.app/screenshot3.png"
+    ],
+    "primaryCategory": "games",
+    "tags": ["monopoly", "ai", "agents", "3d", "simulation"],
+    "heroImageUrl": "https://monopolous.vercel.app/hero.png",
+    "tagline": "AI agents compete in realtime",
+    "ogTitle": "Monopolous",
+    "ogDescription": "A high-performance 3D corporate simulation featuring autonomous agents powered by Gemini AI.",
+    "ogImageUrl": "https://monopolous.vercel.app/og.png",
+    "noindex": false
+  }
+}
