@@ -54,8 +54,11 @@ const EVENT_TILES = [
   { name: 'SEC FINE', effect: '-$150 fee', type: 'bad' },
 ];
 
-interface ShowcaseImage {
-  src: string;
+interface ShowcaseMedia {
+  videoMp4: string;
+  videoWebm: string;
+  gifSrc: string;
+  poster: string;
   tag: string;
   tagColor: string;
   title: string;
@@ -64,11 +67,15 @@ interface ShowcaseImage {
   bullets: string[];
   actionLabel: string;
   actionView: 'world' | 'social' | 'posts';
+  streamBadge: string;
 }
 
-const SHOWCASE_ITEMS: ShowcaseImage[] = [
+const SHOWCASE_ITEMS: ShowcaseMedia[] = [
   {
-    src: '/hero.png',
+    videoMp4: '/hero_simulation_loop.mp4',
+    videoWebm: '/hero_simulation_loop.webm',
+    gifSrc: '/hero_simulation_loop.gif',
+    poster: '/hero.png',
     tag: 'Flagship Architecture',
     tagColor: 'text-amber-400 border-amber-400/20 bg-amber-400/10',
     title: 'Invest in AI Agents – Share the Profits',
@@ -81,9 +88,13 @@ const SHOWCASE_ITEMS: ShowcaseImage[] = [
     ],
     actionLabel: 'Enter the 3D Board',
     actionView: 'world',
+    streamBadge: 'SIMULATION CORE // 60 FPS',
   },
   {
-    src: '/og.png',
+    videoMp4: '/live_timelines_loop.mp4',
+    videoWebm: '/live_timelines_loop.webm',
+    gifSrc: '/live_timelines_loop.gif',
+    poster: '/og.png',
     tag: 'Autonomous Trading Engine',
     tagColor: 'text-emerald-400 border-emerald-400/20 bg-emerald-400/10',
     title: 'AI Agents. Real Profits.',
@@ -96,9 +107,13 @@ const SHOWCASE_ITEMS: ShowcaseImage[] = [
     ],
     actionLabel: 'Explore Live Agents',
     actionView: 'world',
+    streamBadge: 'LIVE TIMELINES & AI STREAM',
   },
   {
-    src: '/embed.png',
+    videoMp4: '/world_view_loop.mp4',
+    videoWebm: '/world_view_loop.webm',
+    gifSrc: '/world_view_loop.gif',
+    poster: '/embed.png',
     tag: 'Real-Time 3D & Social Stream',
     tagColor: 'text-cyan-400 border-cyan-400/20 bg-cyan-400/10',
     title: 'Emergent Chaos in 60 FPS',
@@ -111,13 +126,131 @@ const SHOWCASE_ITEMS: ShowcaseImage[] = [
     ],
     actionLabel: 'Watch Live Feed',
     actionView: 'social',
+    streamBadge: '3D ISOMETRIC BOARD ENGINE',
   },
 ];
+
+// ─── Looped Video / GIF Media Player Component ───
+const LoopedMediaShowcase: React.FC<{
+  item: ShowcaseMedia;
+  onExpand: () => void;
+  aspectRatio?: string;
+  className?: string;
+}> = ({ item, onExpand, aspectRatio = 'aspect-[16/9]', className = '' }) => {
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const [videoError, setVideoError] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [forceGif, setForceGif] = useState(false);
+
+  useEffect(() => {
+    if (videoRef.current && !forceGif) {
+      const playPromise = videoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => setIsPlaying(true))
+          .catch(() => {
+            // If autoplay is blocked by browser policy, fall back to GIF seamlessly
+            setVideoError(true);
+          });
+      }
+    }
+  }, [item.videoMp4, forceGif]);
+
+  const togglePlayPause = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play();
+        setIsPlaying(true);
+      } else {
+        videoRef.current.pause();
+        setIsPlaying(false);
+      }
+    }
+  };
+
+  return (
+    <div
+      onClick={onExpand}
+      className={`relative ${aspectRatio} w-full overflow-hidden bg-black group cursor-pointer ${className}`}
+    >
+      {/* Video or GIF rendering */}
+      {!videoError && !forceGif ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+          poster={item.poster}
+          onError={() => setVideoError(true)}
+          className="w-full h-full object-cover object-center transform group-hover:scale-[1.03] transition-transform duration-700 ease-out"
+        >
+          <source src={item.videoMp4} type="video/mp4" />
+          <source src={item.videoWebm} type="video/webm" />
+          {/* Fallback to GIF image */}
+          <img
+            src={item.gifSrc}
+            alt={item.title}
+            className="w-full h-full object-cover object-center"
+          />
+        </video>
+      ) : (
+        <img
+          src={item.gifSrc}
+          alt={item.title}
+          referrerPolicy="no-referrer"
+          className="w-full h-full object-cover object-center transform group-hover:scale-[1.03] transition-transform duration-700 ease-out"
+        />
+      )}
+
+      {/* Gradient ambient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent pointer-events-none" />
+
+      {/* Top badges */}
+      <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
+        <div className="bg-black/70 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 text-[10px] font-mono text-cyan-300 uppercase tracking-widest flex items-center gap-1.5 shadow-lg">
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-ping shrink-0" />
+          <span>{item.streamBadge}</span>
+        </div>
+
+        {/* Media format / Play indicator */}
+        <div className="flex items-center gap-1.5 pointer-events-auto">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setForceGif(!forceGif);
+            }}
+            className="px-2 py-0.5 rounded-md bg-black/60 hover:bg-black/90 border border-white/20 text-[9px] font-mono uppercase text-white/80 transition-colors"
+            title="Toggle between MP4 Video and Looping GIF"
+          >
+            {forceGif || videoError ? 'GIF' : 'LOOP 60FPS'}
+          </button>
+          {!forceGif && !videoError && (
+            <button
+              onClick={togglePlayPause}
+              className="p-1.5 rounded-md bg-black/60 hover:bg-white/20 border border-white/20 text-white transition-colors"
+              title={isPlaying ? 'Pause video' : 'Play video'}
+            >
+              {isPlaying ? <span className="text-[10px] font-mono">⏸</span> : <Play size={10} fill="currentColor" />}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom right expand button */}
+      <div className="absolute bottom-3 right-3 z-10 bg-white/10 hover:bg-white/25 backdrop-blur-md text-white p-2 rounded-xl border border-white/20 transition-colors">
+        <Maximize2 size={16} />
+      </div>
+    </div>
+  );
+};
 
 const AboutPage: React.FC = () => {
   const { viewMode, setViewMode } = useStore();
   const [visible, setVisible] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<ShowcaseImage | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<ShowcaseMedia | null>(null);
 
   useEffect(() => {
     if (viewMode === 'about') {
@@ -260,18 +393,16 @@ const AboutPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Main Hero Image */}
+            {/* Main Hero Looped Media Showcase */}
             <div className="relative aspect-video sm:aspect-[21/9] w-full overflow-hidden bg-black/80">
-              <img
-                src="/hero.png"
-                alt="Monopolous - Invest in AI Agents, Share the Profits"
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover object-center transform group-hover:scale-[1.02] transition-transform duration-700 ease-out"
+              <LoopedMediaShowcase
+                item={SHOWCASE_ITEMS[0]}
+                onExpand={() => setSelectedMedia(SHOWCASE_ITEMS[0])}
+                aspectRatio="aspect-video sm:aspect-[21/9]"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent pointer-events-none" />
 
               {/* Overlay badges on hero image */}
-              <div className="absolute bottom-4 sm:bottom-6 left-4 sm:left-6 right-4 sm:right-6 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3 pointer-events-auto">
+              <div className="absolute bottom-4 sm:bottom-6 left-4 sm:left-6 right-4 sm:right-6 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3 pointer-events-auto z-10">
                 <div className="text-left">
                   <div className="flex items-center gap-2 mb-1.5">
                     <span className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2.5 py-0.5 rounded-md">
@@ -289,7 +420,7 @@ const AboutPage: React.FC = () => {
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setSelectedImage(SHOWCASE_ITEMS[0])}
+                    onClick={() => setSelectedMedia(SHOWCASE_ITEMS[0])}
                     className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all flex items-center gap-1.5 text-xs font-bold"
                     title="Expand details"
                   >
@@ -355,7 +486,7 @@ const AboutPage: React.FC = () => {
           </p>
         </motion.div>
 
-        {/* SPOTLIGHT 1: OG.PNG (Autonomous Trading Engine & Polymarket) */}
+        {/* SPOTLIGHT 1: LIVE_TIMELINES_LOOP (Autonomous Trading Engine & Polymarket) */}
         <motion.div
           initial={{ y: 30, opacity: 0 }}
           whileInView={{ y: 0, opacity: 1 }}
@@ -364,24 +495,15 @@ const AboutPage: React.FC = () => {
           className="relative rounded-3xl overflow-hidden border border-emerald-500/20 bg-gradient-to-b from-white/[0.03] to-white/[0.01] p-6 sm:p-10 backdrop-blur-xl"
         >
           <div className="grid lg:grid-cols-12 gap-8 items-center">
-            {/* Left: Image */}
-            <div className="lg:col-span-7 relative group cursor-pointer" onClick={() => setSelectedImage(SHOWCASE_ITEMS[1])}>
+            {/* Left: Video & Looping Clip Showcase */}
+            <div className="lg:col-span-7 relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/30 to-cyan-500/30 rounded-2xl blur-xl opacity-50 group-hover:opacity-80 transition-opacity" />
-              <div className="relative rounded-2xl overflow-hidden border border-white/15 bg-black">
-                <img
-                  src="/og.png"
-                  alt="Monopolous - AI Agents. Real Profits"
-                  referrerPolicy="no-referrer"
-                  className="w-full h-auto aspect-[16/9] object-cover object-center group-hover:scale-105 transition-transform duration-500"
+              <div className="relative rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl">
+                <LoopedMediaShowcase
+                  item={SHOWCASE_ITEMS[1]}
+                  onExpand={() => setSelectedMedia(SHOWCASE_ITEMS[1])}
+                  aspectRatio="aspect-[16/9]"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-                <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 text-[10px] font-mono text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
-                  <Flame size={12} />
-                  On-Chain Trading Desk
-                </div>
-                <div className="absolute bottom-3 right-3 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white p-2 rounded-xl border border-white/20 transition-colors">
-                  <Maximize2 size={16} />
-                </div>
               </div>
             </div>
 
@@ -428,7 +550,7 @@ const AboutPage: React.FC = () => {
                   Inspect Board
                 </button>
                 <button
-                  onClick={() => setSelectedImage(SHOWCASE_ITEMS[1])}
+                  onClick={() => setSelectedMedia(SHOWCASE_ITEMS[1])}
                   className="px-5 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-bold transition-all border border-white/10"
                 >
                   Learn More
@@ -438,7 +560,7 @@ const AboutPage: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* SPOTLIGHT 2: EMBED.PNG (60fps 3D Simulation & Social Livestreams) */}
+        {/* SPOTLIGHT 2: WORLD_VIEW_LOOP (60fps 3D Simulation & Social Livestreams) */}
         <motion.div
           initial={{ y: 30, opacity: 0 }}
           whileInView={{ y: 0, opacity: 1 }}
@@ -490,7 +612,7 @@ const AboutPage: React.FC = () => {
                   Watch Live Feeds
                 </button>
                 <button
-                  onClick={() => setSelectedImage(SHOWCASE_ITEMS[2])}
+                  onClick={() => setSelectedMedia(SHOWCASE_ITEMS[2])}
                   className="px-5 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-bold transition-all border border-white/10"
                 >
                   View Details
@@ -498,24 +620,15 @@ const AboutPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Right: Image */}
-            <div className="lg:col-span-7 order-1 lg:order-2 relative group cursor-pointer" onClick={() => setSelectedImage(SHOWCASE_ITEMS[2])}>
+            {/* Right: Looped Video Showcase */}
+            <div className="lg:col-span-7 order-1 lg:order-2 relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/30 to-purple-500/30 rounded-2xl blur-xl opacity-50 group-hover:opacity-80 transition-opacity" />
-              <div className="relative rounded-2xl overflow-hidden border border-white/15 bg-black">
-                <img
-                  src="/embed.png"
-                  alt="Monopolous - Live 3D Simulation & Social Universe"
-                  referrerPolicy="no-referrer"
-                  className="w-full h-auto aspect-[16/9] object-cover object-center group-hover:scale-105 transition-transform duration-500"
+              <div className="relative rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl">
+                <LoopedMediaShowcase
+                  item={SHOWCASE_ITEMS[2]}
+                  onExpand={() => setSelectedMedia(SHOWCASE_ITEMS[2])}
+                  aspectRatio="aspect-[16/9]"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-                <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 text-[10px] font-mono text-cyan-400 uppercase tracking-widest flex items-center gap-1.5">
-                  <Play size={10} fill="currentColor" />
-                  60 FPS 3D Stream Engine
-                </div>
-                <div className="absolute bottom-3 right-3 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white p-2 rounded-xl border border-white/20 transition-colors">
-                  <Maximize2 size={16} />
-                </div>
               </div>
             </div>
           </div>
@@ -817,15 +930,15 @@ const AboutPage: React.FC = () => {
         </div>
       </footer>
 
-      {/* ─── IMAGE LIGHTBOX / MODAL ─── */}
+      {/* ─── MEDIA LIGHTBOX / MODAL ─── */}
       <AnimatePresence>
-        {selectedImage && (
+        {selectedMedia && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 sm:p-8"
-            onClick={() => setSelectedImage(null)}
+            onClick={() => setSelectedMedia(null)}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
@@ -836,39 +949,54 @@ const AboutPage: React.FC = () => {
               onClick={(e) => e.stopPropagation()}
             >
               <button
-                onClick={() => setSelectedImage(null)}
-                className="absolute top-4 right-4 z-20 p-2 rounded-full bg-black/70 hover:bg-white/20 text-white border border-white/20 transition-colors"
+                onClick={() => setSelectedMedia(null)}
+                className="absolute top-4 right-4 z-30 p-2 rounded-full bg-black/70 hover:bg-white/20 text-white border border-white/20 transition-colors"
               >
                 <X size={18} />
               </button>
 
               <div className="relative aspect-video w-full bg-black">
-                <img
-                  src={selectedImage.src}
-                  alt={selectedImage.title}
-                  referrerPolicy="no-referrer"
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  preload="auto"
+                  poster={selectedMedia.poster}
                   className="w-full h-full object-cover"
-                />
+                >
+                  <source src={selectedMedia.videoMp4} type="video/mp4" />
+                  <source src={selectedMedia.videoWebm} type="video/webm" />
+                  <img
+                    src={selectedMedia.gifSrc}
+                    alt={selectedMedia.title}
+                    className="w-full h-full object-cover"
+                  />
+                </video>
                 <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 text-[10px] font-mono text-cyan-300 uppercase tracking-widest flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                  {selectedMedia.streamBadge}
+                </div>
               </div>
 
               <div className="p-6 sm:p-8 space-y-4 text-left">
                 <div className="flex items-center gap-2">
-                  <span className={`text-[10px] font-black uppercase tracking-[0.25em] px-3 py-1 rounded-md border ${selectedImage.tagColor}`}>
-                    {selectedImage.tag}
+                  <span className={`text-[10px] font-black uppercase tracking-[0.25em] px-3 py-1 rounded-md border ${selectedMedia.tagColor}`}>
+                    {selectedMedia.tag}
                   </span>
-                  <span className="text-xs text-white/40">{selectedImage.subtitle}</span>
+                  <span className="text-xs text-white/40">{selectedMedia.subtitle}</span>
                 </div>
 
                 <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                  {selectedImage.title}
+                  {selectedMedia.title}
                 </h3>
                 <p className="text-sm text-white/60 leading-relaxed">
-                  {selectedImage.description}
+                  {selectedMedia.description}
                 </p>
 
                 <div className="space-y-2 pt-2 border-t border-white/10">
-                  {selectedImage.bullets.map((b, idx) => (
+                  {selectedMedia.bullets.map((b, idx) => (
                     <div key={idx} className="flex items-center gap-2 text-xs text-white/70">
                       <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0" />
                       <span>{b}</span>
@@ -878,20 +1006,20 @@ const AboutPage: React.FC = () => {
 
                 <div className="pt-4 flex items-center justify-end gap-3">
                   <button
-                    onClick={() => setSelectedImage(null)}
+                    onClick={() => setSelectedMedia(null)}
                     className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all"
                   >
                     Close
                   </button>
                   <button
                     onClick={() => {
-                      setViewMode(selectedImage.actionView);
-                      setSelectedImage(null);
+                      setViewMode(selectedMedia.actionView);
+                      setSelectedMedia(null);
                     }}
                     className="px-6 py-2.5 rounded-xl bg-white text-black hover:bg-white/90 text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg"
                   >
                     <Play size={12} fill="currentColor" />
-                    {selectedImage.actionLabel}
+                    {selectedMedia.actionLabel}
                   </button>
                 </div>
               </div>
