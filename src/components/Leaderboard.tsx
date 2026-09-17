@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { AGENTS, ARC_AGENTS } from '../data/agents';
@@ -67,11 +66,10 @@ const RISK_COLOR: Record<string, string> = {
 
 const PRESET_AMOUNTS = [1, 5, 10, 50];
 
-const Leaderboard: React.FC = () => {
+export const Leaderboard: React.FC = () => {
   const { leaderboard, agentBalances, viewMode, updateBalance, updateLeaderboard, userAddress, setUserAddress } = useStore();
   const [arcBalances, setArcBalances] = useState<Record<number, number>>({});
-  // Collapse by default on mobile screens to avoid blocking the 3D world
-  const [collapsed, setCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const [collapsed, setCollapsed] = useState(false);
   const [fundingIndex, setFundingIndex] = useState<number | null>(null);
   const [selectedAmount, setSelectedAmount] = useState<number>(5);
   const [payState, setPayState] = useState<'idle' | 'success' | 'error'>('idle');
@@ -156,23 +154,35 @@ const Leaderboard: React.FC = () => {
   return (
     <>
       <motion.div
-        initial={{ x: 300, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        className="fixed top-16 sm:top-20 md:top-24 right-3 sm:right-4 md:right-8 w-48 sm:w-56 md:w-64 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/10 z-[100] pointer-events-auto overflow-hidden max-h-[80vh]"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={`pointer-events-auto transition-all shrink-0 ${
+          collapsed
+            ? 'w-auto'
+            : 'w-64 sm:w-72 bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-cyan-500/30 shadow-2xl overflow-hidden'
+        }`}
+        style={{ maxHeight: 520 }}
       >
-        {/* Header */}
+        {/* Header / Toggle Button */}
         <button
-          onClick={() => setCollapsed(c => !c)}
-          className="w-full flex items-center justify-between px-3 md:px-4 py-3 md:py-4 hover:bg-white/5 transition-colors"
+          onClick={() => setCollapsed((c) => !c)}
+          className={`flex items-center justify-between gap-2 transition-colors ${
+            collapsed
+              ? 'px-3 py-2 rounded-xl border border-cyan-500/30 bg-black/60 backdrop-blur hover:bg-white/10 text-white shadow-lg'
+              : 'w-full px-4 py-3 bg-slate-800/80 hover:bg-slate-800 border-b border-cyan-500/20 text-white'
+          }`}
         >
           <div className="flex items-center gap-2">
-            <Trophy className="text-yellow-500" size={16} />
-            <h3 className="text-white font-black text-[10px] md:text-xs uppercase tracking-widest">Top Traders</h3>
+            <TrendingUp className="text-emerald-400 animate-pulse shrink-0" size={15} />
+            <h3 className="text-white font-black text-xs uppercase tracking-wider whitespace-nowrap">
+              Top Traders
+            </h3>
           </div>
-          {collapsed
-            ? <ChevronDown size={12} className="text-white/40" />
-            : <ChevronUp size={12} className="text-white/40" />
-          }
+          {collapsed ? (
+            <ChevronDown size={14} className="text-slate-400 shrink-0" />
+          ) : (
+            <ChevronUp size={14} className="text-slate-400 shrink-0" />
+          )}
         </button>
 
         <AnimatePresence initial={false}>
@@ -182,10 +192,10 @@ const Leaderboard: React.FC = () => {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2, ease: 'easeInOut' }}
+              transition={{ duration: 0.2 }}
               className="overflow-hidden"
             >
-              <div className="px-3 md:px-4 pb-3 md:pb-4 space-y-2 md:space-y-3 overflow-y-auto max-h-[50vh]">
+              <div className="p-3 space-y-2 max-h-[440px] overflow-y-auto">
                 {leaderboard.map((entry, i) => {
                   const agent = AGENTS[entry.agentIndex];
                   if (!agent) return null;
@@ -197,35 +207,43 @@ const Leaderboard: React.FC = () => {
                     <button
                       key={entry.agentIndex}
                       onClick={() => openFund(entry.agentIndex)}
-                      className="w-full flex items-center justify-between group rounded-xl px-2 py-1.5 -mx-2 hover:bg-white/5 active:bg-white/10 transition-colors cursor-pointer"
+                      className="w-full flex items-center justify-between group rounded-xl px-2 py-1.5 bg-black/30 border border-white/5 hover:border-cyan-500/30 hover:bg-white/5 active:bg-white/10 transition-colors cursor-pointer text-left"
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[10px] font-black text-white/40 w-4 shrink-0">{i + 1}</span>
+                        <span className="text-[10px] font-black text-white/40 w-3.5 shrink-0">{i + 1}</span>
                         <div
-                          className="w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-black text-white border border-white/10 shrink-0"
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black text-white border border-white/10 shrink-0"
                           style={{ backgroundColor: agent.color }}
                         >
                           {agent.role[0]}
                         </div>
                         <div className="text-left min-w-0">
-                          <p className="text-white text-[9px] md:text-[10px] font-bold truncate w-16 md:w-20">@{agent.role.replace(/\s+/g, '').toLowerCase()}</p>
-                          <p className="text-white/40 text-[7px] md:text-[8px] uppercase tracking-widest truncate">{agent.department}</p>
-                          <p className="text-blue-400/50 text-[6px] md:text-[7px] font-mono">{agent.wallet.address.slice(0, 6)}…{agent.wallet.address.slice(-4)}</p>
+                          <p className="text-white text-[10px] font-bold truncate max-w-[90px]">
+                            @{agent.role.replace(/\s+/g, '').toLowerCase()}
+                          </p>
+                          <p className="text-slate-400 text-[7px] uppercase tracking-wider truncate">
+                            {agent.department}
+                          </p>
+                          <p className="text-cyan-400/60 text-[7px] font-mono">
+                            {agent.wallet.address.slice(0, 6)}…{agent.wallet.address.slice(-4)}
+                          </p>
                         </div>
                       </div>
+
                       {/* PnL % column */}
-                      <div className="flex flex-col items-center shrink-0 mx-1.5">
-                        <span className={`text-[8px] md:text-[9px] font-black tabular-nums ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+                      <div className="flex flex-col items-center shrink-0 mx-1">
+                        <span className={`text-[9px] font-black tabular-nums ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
                           {isProfit ? '+' : ''}{pnlPct}%
                         </span>
                         <span className={`text-[6px] font-black uppercase tracking-widest ${isProfit ? 'text-emerald-600' : 'text-red-600'}`}>
                           PnL
                         </span>
                       </div>
+
                       {/* Net worth + fund */}
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        <p className="text-white text-[9px] md:text-[10px] font-black">${entry.netWorth.toLocaleString()}</p>
-                        <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[7px] font-black uppercase tracking-widest transition-all bg-white/5 text-white/30 group-hover:bg-blue-500/20 group-hover:text-blue-300">
+                      <div className="flex flex-col items-end gap-0.5 shrink-0">
+                        <p className="text-white text-[10px] font-black">${entry.netWorth.toLocaleString()}</p>
+                        <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-wider transition-all bg-white/10 text-cyan-300 group-hover:bg-cyan-500/30 group-hover:text-cyan-200">
                           <Zap size={7} /> Fund
                         </span>
                       </div>
@@ -234,47 +252,51 @@ const Leaderboard: React.FC = () => {
                 })}
 
                 <div className="pt-2 border-t border-white/10">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-cyan-300 mb-2">ARC Agents (On-chain)</p>
-                  <div className="space-y-2">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-cyan-300 mb-1.5">ARC Agents (On-chain)</p>
+                  <div className="space-y-1.5">
                     {ARC_AGENTS.map((agent) => {
                       const bal = arcBalances[agent.index] ?? agent.wallet.balance;
                       return (
                         <div
                           key={agent.index}
-                          className="w-full flex items-center justify-between rounded-xl px-2 py-1.5 -mx-2 bg-cyan-500/5 border border-cyan-400/10"
+                          className="w-full flex items-center justify-between rounded-xl px-2 py-1.5 bg-cyan-950/30 border border-cyan-400/20"
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <div
-                              className="w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-black text-white border border-white/10 shrink-0"
+                              className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black text-white border border-white/10 shrink-0"
                               style={{ backgroundColor: agent.color }}
                             >
                               {agent.role[0]}
                             </div>
                             <div className="text-left min-w-0">
-                              <p className="text-white text-[9px] md:text-[10px] font-bold truncate w-20 md:w-24">{agent.role}</p>
-                              <p className="text-cyan-300/70 text-[7px] md:text-[8px] uppercase tracking-widest truncate">ARC Protocol</p>
-                              <p className="text-cyan-400/60 text-[6px] md:text-[7px] font-mono">{agent.wallet.address.slice(0, 6)}…{agent.wallet.address.slice(-4)}</p>
+                              <p className="text-white text-[10px] font-bold truncate max-w-[100px]">{agent.role}</p>
+                              <p className="text-cyan-300/70 text-[7px] uppercase tracking-wider truncate">ARC Protocol</p>
+                              <p className="text-cyan-400/60 text-[7px] font-mono">{agent.wallet.address.slice(0, 6)}…{agent.wallet.address.slice(-4)}</p>
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <p className="text-cyan-300 text-[9px] md:text-[10px] font-black">${bal.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
-                            <p className="text-[7px] md:text-[8px] text-cyan-500/70 font-bold uppercase tracking-widest">USDC</p>
+                            <p className="text-cyan-300 text-[10px] font-black">${bal.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                            <p className="text-[7px] text-cyan-500/70 font-bold uppercase tracking-wider">USDC</p>
                           </div>
                         </div>
                       );
                     })}
                   </div>
                 </div>
-              </div>
 
-              <div className="px-3 md:px-4 pb-3 md:pb-4 pt-0 border-t border-white/10">
-                <div className="flex items-center justify-between text-white/60 pt-3 md:pt-4">
+                <div className="pt-2 border-t border-white/10 flex items-center justify-between text-slate-400 text-[8px] font-mono">
                   <div className="flex items-center gap-1">
-                    <Wallet size={10} className="md:w-3 md:h-3" />
-                    <span className="text-[7px] md:text-[8px] font-black uppercase tracking-widest">
-                      {userAddress ? `${userAddress.slice(0, 6)}…${userAddress.slice(-4)}` : 'Not connected'}
-                    </span>
+                    <Wallet size={10} className="text-cyan-400" />
+                    <span>{userAddress ? `${userAddress.slice(0, 6)}…${userAddress.slice(-4)}` : 'Not connected'}</span>
                   </div>
+                  {!userAddress && (
+                    <button
+                      onClick={() => setWalletModalOpen(true)}
+                      className="text-cyan-400 hover:text-cyan-300 font-bold uppercase"
+                    >
+                      Connect
+                    </button>
+                  )}
                 </div>
               </div>
             </motion.div>

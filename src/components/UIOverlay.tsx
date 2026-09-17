@@ -117,13 +117,11 @@ const UIOverlay: React.FC = () => {
       
       <SocialFeed />
       <PostsFeed />
-      <Leaderboard />
       <CameraControls />
       <HeatmapLegend />
       <PhysicalCharactersModal />
       <SkyscraperModal />
       <WeatherWidget />
-      <TopAgentsLeaderboard />
       <AudioVoiceHUD />
 
       {/* Token Launches Panel — shows in social/posts mode */}
@@ -133,18 +131,16 @@ const UIOverlay: React.FC = () => {
         </div>
       )}
 
-      {/* BNKR Wallet Panel — shows in social/posts/world modes */}
-      {(viewMode === 'social' || viewMode === 'posts' || viewMode === 'world') && (
-        <BnkrWalletPanel />
-      )}
-
-      {/* ARC Protocol Agents Panel — shows in social/posts/world modes */}
+      {/* Top-Left: ARC Protocol Agents Panel, Top Performing Agents, Top Traders & BNKR Wallets */}
       {(viewMode === 'social' || viewMode === 'posts' || viewMode === 'world') && (
         <div 
-          className="fixed left-3 sm:left-4 z-[105] pointer-events-auto"
+          className="fixed left-3 sm:left-4 z-[105] pointer-events-auto flex items-start gap-2 sm:gap-3 flex-wrap max-w-[calc(100vw-24px)]"
           style={{ top: 'max(env(safe-area-inset-top, 0px) + 12px, 16px)' }}
         >
           <ArcAgentsPanel />
+          <TopAgentsLeaderboard />
+          <Leaderboard />
+          <BnkrWalletPanel />
         </div>
       )}
 

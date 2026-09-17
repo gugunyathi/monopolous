@@ -27,20 +27,35 @@ export const TopAgentsLeaderboard: React.FC = () => {
 
   return (
     <motion.div
-      initial={{ x: -300, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      className="fixed top-20 left-4 sm:left-6 z-[120] pointer-events-auto w-64 sm:w-72 bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-cyan-500/30 shadow-2xl overflow-hidden"
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`pointer-events-auto transition-all shrink-0 ${
+        collapsed
+          ? 'w-auto'
+          : 'w-64 sm:w-72 bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-cyan-500/30 shadow-2xl overflow-hidden'
+      }`}
+      style={{ maxHeight: 520 }}
     >
-      {/* Header */}
+      {/* Header / Toggle Button */}
       <button
         onClick={() => setCollapsed(c => !c)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-slate-800/80 hover:bg-slate-800 transition-colors border-b border-cyan-500/20"
+        className={`flex items-center justify-between gap-2 transition-colors ${
+          collapsed
+            ? 'px-3 py-2 rounded-xl border border-cyan-500/30 bg-black/60 backdrop-blur hover:bg-white/10 text-white shadow-lg'
+            : 'w-full px-4 py-3 bg-slate-800/80 hover:bg-slate-800 border-b border-cyan-500/20 text-white'
+        }`}
       >
         <div className="flex items-center gap-2">
-          <Trophy className="text-amber-400 animate-pulse" size={16} />
-          <h3 className="text-white font-black text-xs uppercase tracking-wider">Top Performing Agents</h3>
+          <Trophy className="text-amber-400 animate-pulse shrink-0" size={15} />
+          <h3 className="text-white font-black text-xs uppercase tracking-wider whitespace-nowrap">
+            Top Performing Agents
+          </h3>
         </div>
-        {collapsed ? <ChevronDown size={14} className="text-slate-400" /> : <ChevronUp size={14} className="text-slate-400" />}
+        {collapsed ? (
+          <ChevronDown size={14} className="text-slate-400 shrink-0" />
+        ) : (
+          <ChevronUp size={14} className="text-slate-400 shrink-0" />
+        )}
       </button>
 
       <AnimatePresence initial={false}>
@@ -52,7 +67,7 @@ export const TopAgentsLeaderboard: React.FC = () => {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="p-3 space-y-2 max-h-[60vh] overflow-y-auto">
+            <div className="p-3 space-y-2 max-h-[440px] overflow-y-auto">
               {topAgents.map((item, index) => {
                 const { agentIndex, agent, netWorth } = item;
                 const isSelected = selectedNpcIndex === agentIndex;
