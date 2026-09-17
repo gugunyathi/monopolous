@@ -1,12 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import HelpModal from './HelpModal';
-import ChatPanel from './ChatPanel';
 import SignInButton from './SignInButton';
 import AboutPage from './AboutPage';
 import { AGENTS, ARC_AGENTS } from '../data/agents';
-import { LayoutGrid, Users, Play, Info, FileText } from 'lucide-react';
+import { LayoutGrid, Users, Play, Info, FileText, Send, X as CloseIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 import SocialFeed from './SocialFeed';
@@ -39,14 +38,55 @@ const UIOverlay: React.FC = () => {
     startChat,
     endChat,
     isChatting,
+    chatMessages,
+    sendMessage,
     viewMode,
     setViewMode,
     socialFeed
   } = useStore();
   const [isHelpOpen, setHelpOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const selectedAgent = selectedNpcIndex != null ? AGENTS[selectedNpcIndex] ?? null : null;
   const hoveredAgent = hoveredNpcIndex != null ? AGENTS[hoveredNpcIndex] ?? null : null;
+
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [chatMessages, isThinking]);
+
+  // Clear chat input when chat ends
+  useEffect(() => {
+    if (!isChatting) {
+      setChatInput('');
+      if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
+    }
+  }, [isChatting]);
+
+  const handleChatPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedText = e.clipboardData.getData('text');
+    let idx = 0;
+    if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
+    typingIntervalRef.current = setInterval(() => {
+      if (idx < pastedText.length) {
+        setChatInput(prev => prev + pastedText[idx++]);
+      } else {
+        if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
+      }
+    }, 20);
+  };
+
+  const handleChatSend = async () => {
+    if (!chatInput.trim() || isThinking) return;
+    if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
+    const text = chatInput;
+    setChatInput('');
+    await sendMessage(text);
+  };
 
   const handleStartChat = () => {
     if (selectedNpcIndex !== null) {
@@ -73,9 +113,7 @@ const UIOverlay: React.FC = () => {
 
       <NotificationDeepLinkCard />
 
-      <AnimatePresence>
-        <ChatPanel />
-      </AnimatePresence>
+      {/* ChatPanel removed — chat is now inline in the agent card below */}
       
       <SocialFeed />
       <PostsFeed />
@@ -102,7 +140,10 @@ const UIOverlay: React.FC = () => {
 
       {/* ARC Protocol Agents Panel — shows in social/posts/world modes */}
       {(viewMode === 'social' || viewMode === 'posts' || viewMode === 'world') && (
-        <div className="fixed bottom-20 sm:bottom-24 left-3 sm:left-4 z-[105] pointer-events-auto">
+        <div 
+          className="fixed left-3 sm:left-4 z-[105] pointer-events-auto"
+          style={{ top: 'max(env(safe-area-inset-top, 0px) + 12px, 16px)' }}
+        >
           <ArcAgentsPanel />
         </div>
       )}
@@ -245,69 +286,171 @@ const UIOverlay: React.FC = () => {
 
       {/* NPC Info Panel — shown when an NPC is selected */}
       {selectedAgent && (
-        <div className="absolute bottom-[4.5rem] sm:bottom-20 md:bottom-8 left-3 sm:left-4 md:left-8 w-[calc(100%-1.5rem)] sm:w-[calc(100%-2rem)] md:w-72 bg-white/85 backdrop-blur-2xl rounded-2xl border border-black/5 shadow-2xl p-3 sm:p-4 md:p-5 pointer-events-auto animate-in fade-in slide-in-from-left-4 duration-300 z-30 overflow-hidden max-h-[45vh] sm:max-h-[50vh] md:max-h-[70vh] overflow-y-auto">
+        <div
+          className="absolute bottom-[4.5rem] sm:bottom-20 md:bottom-8 left-3 sm:left-4 md:left-8 w-[calc(100%-1.5rem)] sm:w-[calc(100%-2rem)] md:w-72 bg-white/85 backdrop-blur-2xl rounded-2xl border border-black/5 shadow-2xl pointer-events-auto animate-in fade-in slide-in-from-left-4 duration-300 z-30 overflow-hidden flex flex-col"
+          style={{ maxHeight: isChatting ? '80vh' : '70vh' }}
+        >
           {/* Color accent bar */}
-          <div 
-            className="absolute top-0 left-0 w-full h-1" 
+          <div
+            className="absolute top-0 left-0 w-full h-1 z-10"
             style={{ backgroundColor: selectedAgent.color }}
           />
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-0.5">
-                {selectedAgent.department}
-              </p>
-              <h2 className="text-xl font-black text-zinc-900 leading-tight">{selectedAgent.role}</h2>
+
+          {/* Agent info — scrollable when chat is open */}
+          <div className="p-3 sm:p-4 md:p-5 overflow-y-auto [scrollbar-width:none] flex-shrink-0">
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-0.5">
+                  {selectedAgent.department}
+                </p>
+                <h2 className="text-xl font-black text-zinc-900 leading-tight">{selectedAgent.role}</h2>
+              </div>
             </div>
+
+            {/* Wallet Address */}
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Wallet</span>
+              <code className="text-[9px] font-mono text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">
+                {selectedAgent.wallet.address.slice(0, 6)}…{selectedAgent.wallet.address.slice(-4)}
+              </code>
+              <span className="text-[9px] font-bold text-emerald-500">${selectedAgent.wallet.balance.toLocaleString()} USDC</span>
+            </div>
+
+            {/* Skills */}
+            <div className="flex flex-wrap gap-1 mb-2">
+              {selectedAgent.wallet.skills.map((skill) => (
+                <span key={skill} className="text-[8px] font-bold bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded-full">
+                  {skill}
+                </span>
+              ))}
+            </div>
+
+            <p className="text-xs text-zinc-600 leading-relaxed mb-3 italic">
+              "{selectedAgent.mission}"
+            </p>
+
+            <div className="flex flex-wrap gap-1 mb-3">
+              {selectedAgent.expertise.map((tag) => (
+                <span key={tag} className="text-[10px] font-bold bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full">
+                  {tag}
+                </span>
+              ))}
+            </div>
+
+            <p className="text-[11px] text-zinc-400 leading-snug mb-4">{selectedAgent.personality}</p>
+
+            {isChatting ? (
+              <button
+                onClick={handleEndChat}
+                style={{ backgroundColor: selectedAgent.color }}
+                className="w-full py-3 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-90 active:scale-[0.98] transition-all shadow-lg pointer-events-auto"
+              >
+                End Chat
+              </button>
+            ) : (
+              <button
+                onClick={handleStartChat}
+                className="w-full py-3 bg-zinc-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black active:scale-[0.98] transition-all shadow-lg shadow-zinc-200 pointer-events-auto"
+              >
+                Start Chat
+              </button>
+            )}
           </div>
 
-          {/* Wallet Address */}
-          <div className="flex items-center gap-1.5 mb-2">
-            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Wallet</span>
-            <code className="text-[9px] font-mono text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">
-              {selectedAgent.wallet.address.slice(0, 6)}…{selectedAgent.wallet.address.slice(-4)}
-            </code>
-            <span className="text-[9px] font-bold text-emerald-500">${selectedAgent.wallet.balance.toLocaleString()} USDC</span>
-          </div>
+          {/* Inline Chat — expands below agent info when chatting */}
+          <AnimatePresence>
+            {isChatting && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+                className="flex flex-col border-t border-zinc-100 overflow-hidden"
+              >
+                {/* Chat label */}
+                <div className="px-3 pt-2 pb-1 flex items-center justify-between">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Chat</span>
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[8px] font-bold text-emerald-500 uppercase tracking-widest">Live</span>
+                  </div>
+                </div>
 
-          {/* Skills */}
-          <div className="flex flex-wrap gap-1 mb-2">
-            {selectedAgent.wallet.skills.map((skill) => (
-              <span key={skill} className="text-[8px] font-bold bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded-full">
-                {skill}
-              </span>
-            ))}
-          </div>
+                {/* Messages */}
+                <div
+                  ref={chatScrollRef}
+                  className="flex-1 overflow-y-auto px-3 space-y-3 [scrollbar-width:none]"
+                  style={{ maxHeight: '28vh' }}
+                >
+                  <AnimatePresence initial={false}>
+                    {chatMessages.map((msg, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
+                      >
+                        <div className={`max-w-[90%] px-3 py-2 rounded-2xl text-[12px] leading-relaxed ${
+                          msg.role === 'user'
+                            ? 'bg-blue-50 text-zinc-800 rounded-tr-none border border-blue-100/60'
+                            : 'bg-zinc-100 text-zinc-800 rounded-tl-none border border-zinc-200/60'
+                        }`}>
+                          {msg.text}
+                        </div>
+                        <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest mt-0.5 px-1">
+                          {msg.role === 'user' ? 'You' : selectedAgent.role.split(' ')[0]} · {msg.timestamp}
+                        </span>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
 
-          <p className="text-xs text-zinc-600 leading-relaxed mb-3 italic">
-            "{selectedAgent.mission}"
-          </p>
+                  {isThinking && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-start gap-2">
+                      <div className="bg-zinc-100 px-3 py-2 rounded-2xl rounded-tl-none border border-zinc-200/60">
+                        <div className="flex gap-1">
+                          <div className="w-1 h-1 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <div className="w-1 h-1 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <div className="w-1 h-1 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
 
-          <div className="flex flex-wrap gap-1 mb-3">
-            {selectedAgent.expertise.map((tag) => (
-              <span key={tag} className="text-[10px] font-bold bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full">
-                {tag}
-              </span>
-            ))}
-          </div>
-
-          <p className="text-[11px] text-zinc-400 leading-snug mb-5">{selectedAgent.personality}</p>
-
-          {isChatting ? (
-            <button
-              onClick={handleEndChat}
-              style={{ backgroundColor: selectedAgent.color }}
-              className="w-full py-3 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-90 active:scale-[0.98] transition-all shadow-lg pointer-events-auto"
-            >
-              End Chat
-            </button>
-          ) : (
-            <button
-              onClick={handleStartChat}
-              className="w-full py-3 bg-zinc-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black active:scale-[0.98] transition-all shadow-lg shadow-zinc-200 pointer-events-auto"
-            >
-              Start Chat
-            </button>
-          )}
+                {/* Input */}
+                <div className="p-2 pt-2">
+                  <div className="flex items-center gap-1.5">
+                    <textarea
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      onPaste={handleChatPaste}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleChatSend();
+                        }
+                      }}
+                      placeholder="Message (↵ to send)"
+                      rows={1}
+                      className="flex-1 bg-white border border-zinc-200 rounded-xl px-3 py-2.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400/50 transition-all resize-none [scrollbar-width:none]"
+                    />
+                    <button
+                      onClick={handleChatSend}
+                      disabled={!chatInput.trim() || isThinking}
+                      style={{ backgroundColor: !chatInput.trim() || isThinking ? undefined : selectedAgent.color }}
+                      className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-95 ${
+                        !chatInput.trim() || isThinking
+                          ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed'
+                          : 'text-white shadow-md hover:brightness-90'
+                      }`}
+                    >
+                      <Send size={13} strokeWidth={3} />
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
     </div>

@@ -18,7 +18,7 @@ export const SkyscraperModal: React.FC = () => {
   return (
     <>
       {/* Floating button to open Skyscraper Floor Manager */}
-      <div className="fixed top-20 left-4 z-[130] pointer-events-auto">
+      <div className="fixed top-20 right-[16rem] sm:right-[26rem] z-[130] pointer-events-auto">
         <button
           onClick={() => setIsOpen(true)}
           className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-slate-900/90 border border-cyan-500/40 text-cyan-400 hover:bg-slate-800 transition-all shadow-xl shadow-cyan-500/10 backdrop-blur-xl font-bold text-xs"
