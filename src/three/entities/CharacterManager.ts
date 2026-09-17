@@ -100,7 +100,7 @@ export class CharacterManager {
       const model = gltf.scene;
 
       let skinnedMesh: THREE.SkinnedMesh | null = null;
-      model.traverse((child) => {
+      model.traverse((child: THREE.Object3D) => {
         if ((child as any).isSkinnedMesh && !skinnedMesh) {
           skinnedMesh = child as THREE.SkinnedMesh;
         }
@@ -110,7 +110,7 @@ export class CharacterManager {
         this.baseGeometry = (skinnedMesh as THREE.SkinnedMesh).geometry;
         this.baseMaterial = (skinnedMesh as THREE.SkinnedMesh).material as THREE.MeshStandardMaterial;
       } else {
-        model.traverse((child) => {
+        model.traverse((child: THREE.Object3D) => {
           if ((child as any).isMesh && !this.baseGeometry) {
             const m = child as THREE.Mesh;
             this.baseGeometry = m.geometry;

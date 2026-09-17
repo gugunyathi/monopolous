@@ -464,6 +464,45 @@ export async function getAgentState(agentIndex: number): Promise<AgentStateRecor
   return data?.agent ?? null;
 }
 
+// ─── Agent Chats & Profiles ───────────────────────────────────────────────────
+
+export async function getAgentChatHistory(agentIndex: number, sessionId = 'default_session'): Promise<Array<{ role: 'user' | 'agent'; text: string; timestamp?: string }>> {
+  const { data } = await apiFetch<{ messages: Array<{ role: 'user' | 'agent'; text: string; timestamp?: string }> }>(
+    `/agents/${agentIndex}/chat?sessionId=${sessionId}`
+  );
+  return data?.messages ?? [];
+}
+
+export async function postAgentChatMessage(
+  agentIndex: number,
+  message: { role: 'user' | 'agent'; text: string; timestamp?: string },
+  sessionId = 'default_session',
+): Promise<boolean> {
+  const { error } = await apiFetch(`/agents/${agentIndex}/chat`, {
+    method: 'POST',
+    body: JSON.stringify({ message, sessionId }),
+  });
+  return error === null;
+}
+
+export async function getAgentProfile(agentIndex: number): Promise<Record<string, unknown> | null> {
+  const { data } = await apiFetch<{ profile: Record<string, unknown> }>(`/agents/${agentIndex}/profile`);
+  return data?.profile ?? null;
+}
+
+export async function updateAgentProfile(agentIndex: number, updates: Record<string, unknown>): Promise<boolean> {
+  const { error } = await apiFetch(`/agents/${agentIndex}/profile`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+  return error === null;
+}
+
+export async function getAgentHistory(agentIndex: number): Promise<Record<string, unknown> | null> {
+  const { data } = await apiFetch<Record<string, unknown>>(`/agents/${agentIndex}/history`);
+  return data ?? null;
+}
+
 // ─── Social Feed ──────────────────────────────────────────────────────────────
 
 export async function persistPost(post: {

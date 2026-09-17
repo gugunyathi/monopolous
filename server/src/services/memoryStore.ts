@@ -127,6 +127,28 @@ export interface InMemorySocialPost {
   polymarket?: Record<string, unknown>;
 }
 
+export interface InMemoryAgentChat {
+  agentIndex: number;
+  sessionId: string;
+  userAddress?: string;
+  messages: Array<{ role: 'user' | 'agent'; text: string; timestamp: Date }>;
+  lastMessageAt: Date;
+}
+
+export interface InMemoryAgentProfile {
+  agentIndex: number;
+  name: string;
+  role: string;
+  walletAddress?: string;
+  bnkrWalletId?: string;
+  avatarUrl?: string;
+  personality?: string;
+  strategy?: string;
+  bio?: string;
+  status: string;
+  updatedAt: Date;
+}
+
 class MemoryStore {
   public nonces = new Map<string, InMemoryNonce>();
   public users = new Map<string, InMemoryUser>();
@@ -135,6 +157,8 @@ class MemoryStore {
   public tokens: InMemoryTokenLaunch[] = [];
   public sessions = new Map<string, InMemoryGameSession>();
   public socialPosts: InMemorySocialPost[] = [];
+  public agentChats = new Map<string, InMemoryAgentChat>(); // key: `${agentIndex}_${sessionId}`
+  public agentProfiles = new Map<number, InMemoryAgentProfile>();
 
   constructor() {
     // Seed initial agent states for 20 agents

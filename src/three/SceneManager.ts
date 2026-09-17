@@ -12,6 +12,7 @@ import { agentIndexToSceneIndex } from './entities/CharacterManager';
 import { useStore } from '../store/useStore';
 import { AgentBehavior, ChatMessage } from '../types';
 import { geminiService } from '../services/geminiService';
+import { getAgentChatHistory, postAgentChatMessage } from '../services/apiService';
 import * as THREE from 'three';
 
 export class SceneManager {
@@ -131,11 +132,22 @@ export class SceneManager {
             isThinking: true
           });
 
-          // Auto-presentation
-          const agent = index < AGENTS.length ? AGENTS[index] : ARC_AGENTS[index - AGENTS.length];
-          if (!agent) { useStore.setState({ isThinking: false }); return; }
-          try {
-            const systemInstruction = `You are ${agent.role} at FakeClaw Inc. 
+          // Fetch chat history from MongoDB
+          getAgentChatHistory(index).then(async (history) => {
+            if (history && history.length > 0) {
+              const formatted: ChatMessage[] = history.map((h) => ({
+                role: h.role === 'user' ? 'user' : 'model',
+                text: h.text,
+                timestamp: h.timestamp ? new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              }));
+              useStore.setState({ chatMessages: formatted, isThinking: false });
+              return;
+            }
+
+            const agent = index < AGENTS.length ? AGENTS[index] : ARC_AGENTS[index - AGENTS.length];
+            if (!agent) { useStore.setState({ isThinking: false }); return; }
+            try {
+              const systemInstruction = `You are ${agent.role} at FakeClaw Inc. 
 Department: ${agent.department}
 Mission: ${agent.mission}
 Personality: ${agent.personality}
@@ -143,29 +155,33 @@ Expertise: ${agent.expertise.join(', ')}
 
 Keep your responses extremely brief (1-2 short sentences max) and professional. Introduce yourself very briefly and ask how you can help.`;
 
-            const responseText = await geminiService.chat(
-              systemInstruction,
-              [],
-              "Hello! Please introduce yourself briefly."
-            );
+              const responseText = await geminiService.chat(
+                systemInstruction,
+                [],
+                "Hello! Please introduce yourself briefly."
+              );
 
-            const modelMessage: ChatMessage = {
-              role: 'model',
-              text: responseText,
-              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            };
+              const modelMessage: ChatMessage = {
+                role: 'model',
+                text: responseText,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              };
 
-            useStore.setState((s) => ({ 
-              chatMessages: [modelMessage],
-              isThinking: false 
-            }));
-            
-            this.characters.fadeToAction('Wave', index);
-            setTimeout(() => this.characters.fadeToAction('Idle', index), 2000);
-          } catch (error) {
-            console.error("Auto-presentation error:", error);
+              useStore.setState((s) => ({ 
+                chatMessages: [modelMessage],
+                isThinking: false 
+              }));
+
+              postAgentChatMessage(index, { role: 'agent', text: responseText }).catch(() => {});
+              this.characters.fadeToAction('Wave', index);
+              setTimeout(() => this.characters.fadeToAction('Idle', index), 2000);
+            } catch (error) {
+              console.error("Auto-presentation error:", error);
+              useStore.setState({ isThinking: false });
+            }
+          }).catch(() => {
             useStore.setState({ isThinking: false });
-          }
+          });
         }
       },
       endChat: () => {
@@ -196,6 +212,8 @@ Keep your responses extremely brief (1-2 short sentences max) and professional. 
           isThinking: true 
         }));
 
+        postAgentChatMessage(npcIdx, { role: 'user', text }).catch(() => {});
+
         try {
           const systemInstruction = `You are ${agent.role} at FakeClaw Inc. 
 Department: ${agent.department}
@@ -221,6 +239,8 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
             chatMessages: [...s.chatMessages, modelMessage],
             isThinking: false 
           }));
+
+          postAgentChatMessage(npcIdx, { role: 'agent', text: responseText }).catch(() => {});
           
           this.characters.fadeToAction('Wave', state.selectedNpcIndex);
           setTimeout(() => this.characters.fadeToAction('Idle', state.selectedNpcIndex!), 2000);
@@ -450,7 +470,7 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
 
       let minDst = Infinity;
       let nearestIdx = 0;
-      let nearestTile = null;
+      let nearestTile: any = null;
 
       tiles.forEach((tile, index) => {
         let x = 0, z = 0;
